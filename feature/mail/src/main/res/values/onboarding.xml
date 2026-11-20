@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connect_onboard_title">Connect your Gmail</string>
+    <string name="connect_onboard_body">Choose your Gmail account to bring your inbox into Mail Assistant.</string>
+    <string name="connect_onboard_permissions">Google will ask you to allow access to read, organize, and draft your email. Your Google password stays with Google.</string>
+    <string name="connect_onboard_safety">You review and confirm every send and request to move messages to Trash.</string>
+    <string name="connect_onboard_opening">Opening Google…</string>
+    <string name="connect_onboard_later">Explore AI tools first</string>
+    <string name="connect_onboard_later_body">You can write with AI and browse prompts now. Connect Gmail from your inbox whenever you are ready.</string>
+    <string name="connect_onboard_retry">Try again</string>
+    <string name="connect_onboard_unavailable">Gmail connection is temporarily unavailable. Try again later; you can still explore AI tools.</string>
+</resources>

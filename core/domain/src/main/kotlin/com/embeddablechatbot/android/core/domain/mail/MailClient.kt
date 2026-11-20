@@ -1,0 +1,51 @@
+package com.embeddablechatbot.android.core.domain.mail
+
+import com.embeddablechatbot.android.core.domain.model.Outcome
+
+enum class MailFolder(val wire: String, val title: String) {
+    Inbox("inbox", "Inbox"), Unread("unread", "Unread"), Starred("starred", "Starred"),
+    Attachments("attachments", "Attachments"), Sent("sent", "Sent"), Drafts("drafts", "Drafts"),
+    Archive("archive", "Archive"), Spam("spam", "Spam"), Trash("trash", "Trash"), All("all", "All mail"),
+}
+data class InboxMessage(
+    val id: String, val threadId: String, val from: String, val subject: String,
+    val date: String, val snippet: String, val unread: Boolean, val starred: Boolean,
+)
+data class InboxPage(val messages: List<InboxMessage>, val nextCursor: String?)
+data class OpenMessage(val summary: InboxMessage, val to: String, val body: String, val truncated: Boolean)
+enum class MailChange(val wire: String) {
+    Archive("archive"), Inbox("move_to_inbox"), Read("mark_read"), Unread("mark_unread"),
+    Star("star"), Unstar("unstar"), Spam("mark_spam"), Trash("trash"),
+}
+data class MailChangeReceipt(val actionId: String?, val waitingForApproval: Boolean)
+data class ComposeDraft(val requestId: String, val to: String, val subject: String, val body: String, val replyToMessageId: String? = null)
+data class DraftReceipt(val draftId: String, val actionId: String, val to: String, val subject: String)
+enum class WritingTask(val wire: String, val title: String) { Write("write", "Write"), Reply("reply", "Reply"), Summary("summary", "Summary"), Grammar("grammar", "Grammar"), Translate("translate", "Translate") }
+data class WritingRequest(val operation: WritingTask, val text: String, val tone: String = "Professional", val length: String = "Medium", val language: String = "English")
+
+/** Native mail operations. Provider credentials remain exclusively on the server. */
+interface InboxRepository {
+    suspend fun list(folder: MailFolder, query: String, cursor: String? = null): Outcome<InboxPage>
+    suspend fun read(id: String): Outcome<OpenMessage>
+    suspend fun change(id: String, change: MailChange, requestId: String): Outcome<MailChangeReceipt>
+    suspend fun saveDraft(draft: ComposeDraft): Outcome<DraftReceipt>
+    suspend fun write(request: WritingRequest): Outcome<String>
+}
+
+data class MailPrompt(val id: String, val title: String, val description: String, val category: String, val text: String)
+object MailPrompts {
+    val all = listOf(
+        MailPrompt("meeting", "Arrange a meeting", "An invitation with a clear purpose and next steps.", "Work", "Write a professional meeting invitation. Include the purpose, proposed time and an agenda. Ask for confirmation."),
+        MailPrompt("application", "Job application", "Introduce your experience with confidence.", "Work", "Write a job application email. Highlight my relevant experience, motivation and availability."),
+        MailPrompt("followup", "A thoughtful follow-up", "Keep the conversation moving.", "Work", "Write a polite follow-up after a business meeting. Summarize next steps and ask if any information is needed."),
+        MailPrompt("update", "Project update", "Share progress, blockers and next steps.", "Work", "Write a concise project update covering progress, current blockers and next steps."),
+        MailPrompt("outreach", "Customer engagement", "Start a useful conversation with your audience.", "Marketing", "Write a friendly customer outreach email. Explain the benefit clearly and end with one helpful call to action."),
+        MailPrompt("launch", "Product announcement", "Introduce something worth opening.", "Marketing", "Write an engaging product announcement explaining what is new, who it helps and how to learn more."),
+        MailPrompt("newsletter", "Company newsletter", "Turn your latest news into a clear update.", "Marketing", "Write a company newsletter with a short introduction, three highlights and a useful closing."),
+        MailPrompt("proposal", "A persuasive proposal", "Explain the value, scope and next step.", "Sales", "Write a sales proposal email explaining the customer's need, our solution, its value and a suggested next step."),
+        MailPrompt("sales", "Start a sales conversation", "Make a relevant, personal introduction.", "Sales", "Write a short sales introduction focused on the recipient's needs. Avoid exaggerated claims and ask one specific question."),
+        MailPrompt("thanks", "Say thank you", "Make your appreciation feel personal.", "Personal", "Write a warm thank-you email that explains what I appreciate and why it matters."),
+        MailPrompt("apology", "A sincere apology", "Acknowledge the problem and offer a next step.", "Personal", "Write a sincere apology email. Take responsibility, acknowledge the impact and explain the next step."),
+        MailPrompt("leave", "Time-off request", "Make the dates and handover easy to understand.", "Work", "Write a time-off request with the dates, a handover plan and a request for approval."),
+    )
+}

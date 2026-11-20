@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mail Assistant</string>
+    <string name="notification_channel_approvals">Approval reminders</string>
+    <string name="notification_channel_approvals_desc">Reminders that email actions are waiting for your review. Never shows email content.</string>
+    <string name="notification_approvals_title">Email actions need your review</string>
+    <string name="notification_approvals_body">Open the app to review requests. Nothing is sent until you approve it there.</string>
+    <string name="starting">Starting…</string>
+</resources>

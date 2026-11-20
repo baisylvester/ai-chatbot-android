@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ds_error_unauthorized">Your sign-in expired. Sign in again.</string>
+    <string name="ds_error_offline">Could not connect. Check your connection and try again.</string>
+    <string name="ds_error_network_uncertain">The connection dropped. The server may have received the request; refreshing will show what happened.</string>
+    <plurals name="ds_error_rate_limited">
+        <item quantity="one">Too many requests. Try again in %1$d second.</item>
+        <item quantity="other">Too many requests. Try again in %1$d seconds.</item>
+    </plurals>
+    <string name="ds_error_rate_limited_generic">Too many requests. Wait a moment and try again.</string>
+    <string name="ds_error_server">The server had a problem. Refresh before retrying.</string>
+    <string name="ds_error_protocol">The server sent an unexpected response.</string>
+    <string name="ds_error_not_configured">The app is not configured for a platform yet.</string>
+</resources>

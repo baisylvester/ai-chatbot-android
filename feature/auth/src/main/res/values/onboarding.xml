@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboard_welcome">Your inbox, with a little help</string>
+    <string name="onboard_welcome_body">Find what matters, write thoughtful replies, and make room for your day.</string>
+    <string name="onboard_privacy">Your mailbox stays yours. Sending an email or moving messages to Trash always needs your approval.</string>
+    <string name="onboard_get_started">Get started</string>
+    <string name="onboard_existing_account">I already have an account</string>
+    <string name="onboard_create_account">Create account</string>
+    <string name="onboard_account_body">Create your private Mail Assistant account. You will choose which Gmail account to connect next.</string>
+    <string name="onboard_back">Back</string>
+    <string name="onboard_password_hint">Use at least 12 characters.</string>
+    <string name="onboard_confirm_password">Confirm password</string>
+    <string name="onboard_creating">Creating account…</string>
+    <string name="onboard_check_email">Check your email</string>
+    <string name="onboard_confirmation_body">If registration is available for %1$s, open the confirmation link in your email, then return here and sign in. Check your spam folder too.</string>
+    <string name="onboard_existing_hint">Already registered? Sign in with your existing password instead.</string>
+    <string name="onboard_confirmed">Continue to sign in</string>
+    <string name="onboard_resend">Resend confirmation email</string>
+    <string name="onboard_resend_timer">Resend in %1$s</string>
+    <string name="onboard_resent">Check your inbox for a confirmation email.</string>
+    <string name="onboard_preparing">Setting up your assistant</string>
+    <string name="onboard_preparing_body">Preparing your private account. This should only take a moment.</string>
+    <string name="onboard_retry">Try again</string>
+</resources>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="auth_setup_title">Connect to your platform</string>
+    <string name="auth_setup_intro">Use the same platform, Supabase project and chatbot as the web app so your conversations sync. These values are public; never enter private keys.</string>
+    <string name="auth_platform_url">Platform URL</string>
+    <string name="auth_supabase_url">Supabase URL</string>
+    <string name="auth_supabase_key">Supabase publishable key</string>
+    <string name="auth_chatbot_id">Chatbot public ID (cb_…)</string>
+    <string name="auth_save">Save</string>
+    <string name="auth_sign_in_title">Sign in</string>
+    <string name="auth_sign_in_intro">Sign in to your private Mail Assistant account.</string>
+    <string name="auth_email">Email</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_sign_in">Sign in</string>
+    <string name="auth_signing_in">Signing in…</string>
+    <string name="auth_session_expired">Your session expired. Sign in again to continue.</string>
+    <string name="auth_change_platform">Developer settings</string>
+    <string name="auth_no_account">New here? Create an account to get started.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_signed_in_as">Signed in as %1$s</string>
+    <string name="settings_platform">Platform</string>
+    <string name="settings_chatbot">Chatbot</string>
+    <string name="settings_change_hint">Sign out to change the platform or chatbot.</string>
+    <string name="settings_stream">Show replies as they are written</string>
+    <string name="settings_stream_hint">Streamed text is provisional until the server saves the reply.</string>
+    <string name="settings_reminders">Remind me about emails waiting for approval</string>
+    <string name="settings_reminders_hint">Checks about every 30 minutes while you have a network connection. Not real time. Notifications never show email content and never approve anything.</string>
+    <string name="settings_mailbox">Mailbox connection</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_sign_out_confirm">Sign out? Saved conversations and pending requests on this device will be removed. Your conversations stay on the server.</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_back">Back</string>
+</resources>
