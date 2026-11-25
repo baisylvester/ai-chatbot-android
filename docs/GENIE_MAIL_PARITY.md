@@ -26,7 +26,7 @@ Reference: [GenieMail on Google Play](https://play.google.com/store/apps/details
 
 ## Not yet equivalent to Genie Mail
 
-One Gmail mailbox per platform user is supported. Outlook/Microsoft, iCloud, Yahoo/IMAP, account switching/unified inbox, message pinning, custom labels, attachment upload/download, rich HTML editing, and real-time new-mail push remain gaps. Pinned prompts and attachment filtering are implemented; they do not imply mail pinning or file attachment handling.
+One Gmail mailbox per platform user is supported. Outlook/Microsoft, iCloud, Yahoo/IMAP, account switching/unified inbox, message pinning and real-time new-mail push remain gaps. Custom labels, attachment download/upload, document-attachment summaries, formatted (HTML) email and scheduled send were added in source on 25 November 2026; see [capabilities](MAIL_ASSISTANT_CAPABILITIES.md) for their verification state.
 
 The live platform also needs the native API deployment and database migrations. A signed-in platform account alone does not establish a Gmail connection. Source implementation, unit tests, device UI tests, and real-provider end-to-end tests are separate verification stages.
 

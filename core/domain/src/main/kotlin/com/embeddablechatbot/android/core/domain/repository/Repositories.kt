@@ -99,8 +99,11 @@ interface MailRepository {
     suspend fun disconnect(): Outcome<Unit>
     suspend fun actions(filter: ActionFilter): Outcome<List<MailAction>>
     suspend fun actionDetail(id: String): Outcome<MailActionDetail>
-    suspend fun approve(id: String, version: String): Outcome<MailAction>
+    /** [sendAt] schedules an email for later instead of sending it now; the approval stays bound to [version]. */
+    suspend fun approve(id: String, version: String, sendAt: java.time.Instant? = null): Outcome<MailAction>
     suspend fun reject(id: String): Outcome<MailAction>
+    /** Returns a scheduled email to waiting for approval. */
+    suspend fun unschedule(id: String): Outcome<MailAction>
 }
 
 /** Device-held state of an in-progress mailbox connection (encrypted at rest). */

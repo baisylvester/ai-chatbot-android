@@ -153,6 +153,7 @@ fun MailScreen(onBack: () -> Unit, onOpenAction: (String) -> Unit, viewModel: Ma
 fun statusLabel(status: MailActionStatus): String = stringResource(
     when (status) {
         MailActionStatus.Pending -> R.string.mail_status_pending
+        MailActionStatus.Scheduled -> R.string.mail_status_scheduled
         MailActionStatus.Processing -> R.string.mail_status_processing
         MailActionStatus.Done -> R.string.mail_status_done
         MailActionStatus.Rejected -> R.string.mail_status_rejected
@@ -172,6 +173,7 @@ private fun ActionCard(action: MailAction, onClick: () -> Unit) {
             )
             Text(action.summary, style = MaterialTheme.typography.bodyMedium)
             Text(statusLabel(action.status), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            action.scheduledFor?.let { Text(stringResource(R.string.review_scheduled_for, formatSendTime(it)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
             action.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         }
     }
@@ -182,6 +184,8 @@ private fun ActionCard(action: MailAction, onClick: () -> Unit) {
 fun ApprovalScreen(onBack: () -> Unit, viewModel: ApprovalViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var confirm by rememberSaveable { mutableStateOf(false) }
+    var choosingTime by rememberSaveable { mutableStateOf(false) }
+    var scheduleAt by rememberSaveable { mutableStateOf<Long?>(null) }
     Scaffold(topBar = {
         TopAppBar(
             title = { Text(stringResource(R.string.review_title)) },
@@ -207,10 +211,13 @@ fun ApprovalScreen(onBack: () -> Unit, viewModel: ApprovalViewModel = hiltViewMo
                 ApprovalNotice.Rejected -> StatusBanner(stringResource(if (action.kind == MailActionKind.Send) R.string.review_rejected else R.string.review_trash_rejected), BannerTone.Info)
                 ApprovalNotice.Failed -> StatusBanner(stringResource(R.string.review_failed), BannerTone.Error)
                 ApprovalNotice.Uncertain -> StatusBanner(stringResource(R.string.review_uncertain), BannerTone.Warning)
+                ApprovalNotice.Scheduled -> StatusBanner(stringResource(R.string.review_scheduled_notice), BannerTone.Info)
+                ApprovalNotice.Unscheduled -> StatusBanner(stringResource(R.string.review_unscheduled_notice), BannerTone.Info)
                 null -> Unit
             }
             state.error?.let { StatusBanner(it.message(), BannerTone.Error) }
             Labeled(stringResource(R.string.review_status), statusLabel(action.status))
+            action.scheduledFor?.let { Labeled(stringResource(R.string.review_send_time), formatSendTime(it)) }
             action.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             Labeled(stringResource(R.string.review_account), detail.account)
             detail.send?.let { send ->
@@ -258,10 +265,32 @@ fun ApprovalScreen(onBack: () -> Unit, viewModel: ApprovalViewModel = hiltViewMo
                     enabled = detail.canApprove && !state.working,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) { Text(stringResource(if (state.working) R.string.review_working else if (isSend) R.string.review_send else R.string.review_trash)) }
+                if (isSend) OutlinedButton(onClick = { choosingTime = true }, enabled = detail.canApprove && !state.working, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.review_schedule))
+                }
                 OutlinedButton(onClick = viewModel::reject, enabled = !state.working, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(stringResource(if (isSend) R.string.review_keep_draft else R.string.review_dont_trash))
                 }
             }
+            if (action.status == MailActionStatus.Scheduled) {
+                StatusBanner(stringResource(R.string.review_scheduled_info), BannerTone.Info)
+                OutlinedButton(onClick = viewModel::unschedule, enabled = !state.working, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.review_unschedule))
+                }
+                OutlinedButton(onClick = viewModel::reject, enabled = !state.working, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.review_keep_draft))
+                }
+            }
+        }
+        if (choosingTime) ScheduleSendDialog(onDismiss = { choosingTime = false }, onPick = { choosingTime = false; scheduleAt = it.toEpochMilli() })
+        scheduleAt?.let { millis ->
+            val at = java.time.Instant.ofEpochMilli(millis)
+            AlertDialog(
+                onDismissRequest = { scheduleAt = null },
+                text = { Text(stringResource(R.string.review_confirm_schedule, detail.send?.to?.joinToString().orEmpty(), formatSendTime(at))) },
+                confirmButton = { TextButton(onClick = { scheduleAt = null; viewModel.schedule(at) }) { Text(stringResource(R.string.review_schedule_confirm)) } },
+                dismissButton = { TextButton(onClick = { scheduleAt = null }) { Text(stringResource(R.string.mail_cancel)) } },
+            )
         }
         if (confirm) {
             AlertDialog(

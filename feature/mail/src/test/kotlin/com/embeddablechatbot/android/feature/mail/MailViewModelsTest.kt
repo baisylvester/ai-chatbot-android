@@ -89,6 +89,48 @@ class ApprovalViewModelTest {
         runCurrent()
         assertTrue(mail.approvals.isEmpty())
     }
+
+    @Test
+    fun `scheduling approves the reviewed version for a later time and sends nothing now`() = runTest(dispatcher) {
+        mail.detailResult = Outcome.Ok(sendDetail(version = "v3"))
+        val vm = viewModel()
+        runCurrent()
+        val at = java.time.Instant.parse("2026-11-26T00:00:00Z")
+        vm.schedule(at)
+        vm.schedule(at) // double tap
+        runCurrent()
+        assertEquals(listOf("a1" to "v3"), mail.approvals)
+        assertEquals(listOf<java.time.Instant?>(at), mail.scheduledAt)
+        assertEquals(ApprovalNotice.Scheduled, vm.state.value.notice)
+    }
+
+    @Test
+    fun `a scheduled email can be returned to review or declined`() = runTest(dispatcher) {
+        val scheduled = sendDetail(version = "v3").let { it.copy(action = it.action.copy(status = MailActionStatus.Scheduled)) }
+        mail.detailResult = Outcome.Ok(scheduled)
+        val vm = viewModel()
+        runCurrent()
+        vm.approve() // a scheduled email is not open for a second approval
+        runCurrent()
+        assertTrue(mail.approvals.isEmpty())
+        vm.unschedule()
+        runCurrent()
+        assertEquals(listOf("a1"), mail.unschedules)
+        assertEquals(ApprovalNotice.Unscheduled, vm.state.value.notice)
+        vm.reject()
+        runCurrent()
+        assertEquals(listOf("a1"), mail.rejections)
+    }
+}
+
+class FormattingTest {
+    @Test
+    fun `marks wrap selections and prefix every selected line`() {
+        assertEquals("a **bc** d" to (4 to 6), applyMark("a bc d", 2, 4, TextStyleMark.Bold))
+        assertEquals("- one\n- two" to (11 to 11), applyMark("one\ntwo", 0, 7, TextStyleMark.Bullets))
+        assertEquals("1. one\n2. two", applyMark("- one\n- two", 0, 11, TextStyleMark.Numbers).first)
+        assertEquals("see [docs](https://)", applyMark("see docs", 4, 8, TextStyleMark.Link).first)
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

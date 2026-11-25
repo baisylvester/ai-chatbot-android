@@ -166,14 +166,22 @@ class FakeMailRepository : MailRepository {
     override suspend fun disconnect(): Outcome<Unit> { disconnects++; return Outcome.Ok(Unit) }
     override suspend fun actions(filter: ActionFilter) = actionsResult
     override suspend fun actionDetail(id: String) = detailResult
-    override suspend fun approve(id: String, version: String): Outcome<MailAction> {
+    val scheduledAt = mutableListOf<java.time.Instant?>()
+    val unschedules = mutableListOf<String>()
+    override suspend fun approve(id: String, version: String, sendAt: java.time.Instant?): Outcome<MailAction> {
         approvals += id to version
+        scheduledAt += sendAt
         approveGate?.await()
-        return approveResults.removeFirstOrNull() ?: Outcome.Ok(mailAction(id, MailActionStatus.Done))
+        return approveResults.removeFirstOrNull()
+            ?: Outcome.Ok(if (sendAt != null) mailAction(id, MailActionStatus.Scheduled).copy(scheduledFor = sendAt) else mailAction(id, MailActionStatus.Done))
     }
     override suspend fun reject(id: String): Outcome<MailAction> {
         rejections += id
         return Outcome.Ok(mailAction(id, MailActionStatus.Rejected))
+    }
+    override suspend fun unschedule(id: String): Outcome<MailAction> {
+        unschedules += id
+        return Outcome.Ok(mailAction(id, MailActionStatus.Pending))
     }
 }
 

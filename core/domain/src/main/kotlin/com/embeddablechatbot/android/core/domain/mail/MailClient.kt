@@ -7,25 +7,58 @@ enum class MailFolder(val wire: String, val title: String) {
     Attachments("attachments", "Attachments"), Sent("sent", "Sent"), Drafts("drafts", "Drafts"),
     Archive("archive", "Archive"), Spam("spam", "Spam"), Trash("trash", "Trash"), All("all", "All mail"),
 }
+/** [labelIds] holds only the user's own Gmail labels, never system labels. */
 data class InboxMessage(
     val id: String, val threadId: String, val from: String, val subject: String,
     val date: String, val snippet: String, val unread: Boolean, val starred: Boolean,
+    val labelIds: List<String> = emptyList(),
 )
 data class InboxPage(val messages: List<InboxMessage>, val nextCursor: String?)
-data class OpenMessage(val summary: InboxMessage, val to: String, val body: String, val truncated: Boolean)
+/** A file attached to a received message; [partId] addresses it within that message. */
+data class MessageAttachment(val partId: String, val filename: String, val mimeType: String, val size: Long) {
+    /** Formats the server can read for summaries: documents as text, images through the AI model. */
+    val readable: Boolean get() = filename.substringAfterLast('.', "").lowercase() in setOf("pdf", "docx", "txt", "text", "md", "markdown", "csv", "html", "htm", "png", "jpg", "jpeg", "webp", "heic", "heif") ||
+        mimeType in setOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "text/markdown", "text/csv", "text/html", "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif")
+}
+data class OpenMessage(val summary: InboxMessage, val to: String, val body: String, val truncated: Boolean, val attachments: List<MessageAttachment> = emptyList())
+data class MailLabel(val id: String, val name: String, val color: String? = null)
+data class DownloadedFile(val filename: String, val mimeType: String, val bytes: ByteArray) {
+    override fun equals(other: Any?) = other is DownloadedFile && filename == other.filename && mimeType == other.mimeType && bytes.contentEquals(other.bytes)
+    override fun hashCode() = 31 * filename.hashCode() + bytes.contentHashCode()
+}
+data class AttachmentText(val filename: String, val text: String, val truncated: Boolean)
+/** A file the user picked for a new draft. Held in memory only; the bytes are sent once, with the draft. */
+class OutgoingAttachment(val id: String, val filename: String, val mimeType: String, val bytes: ByteArray) {
+    val size: Long get() = bytes.size.toLong()
+    companion object {
+        const val MAX_TOTAL_BYTES = 10L * 1024 * 1024
+        const val MAX_FILES = 10
+    }
+}
 enum class MailChange(val wire: String) {
     Archive("archive"), Inbox("move_to_inbox"), Read("mark_read"), Unread("mark_unread"),
     Star("star"), Unstar("unstar"), Spam("mark_spam"), Trash("trash"),
 }
 data class MailChangeReceipt(val actionId: String?, val waitingForApproval: Boolean)
-data class ComposeDraft(val requestId: String, val to: String, val subject: String, val body: String, val replyToMessageId: String? = null)
+/** [formatted] sends the body's limited Markdown (bold, italic, lists, links) as HTML with a plain-text alternative. */
+data class ComposeDraft(
+    val requestId: String, val to: String, val subject: String, val body: String, val replyToMessageId: String? = null,
+    val formatted: Boolean = false, val attachments: List<OutgoingAttachment> = emptyList(),
+)
 data class DraftReceipt(val draftId: String, val actionId: String, val to: String, val subject: String)
 enum class WritingTask(val wire: String, val title: String) { Write("write", "Write"), Reply("reply", "Reply"), Summary("summary", "Summary"), Grammar("grammar", "Grammar"), Translate("translate", "Translate") }
 data class WritingRequest(val operation: WritingTask, val text: String, val tone: String = "Professional", val length: String = "Medium", val language: String = "English")
 
 /** Native mail operations. Provider credentials remain exclusively on the server. */
 interface InboxRepository {
-    suspend fun list(folder: MailFolder, query: String, cursor: String? = null): Outcome<InboxPage>
+    /** [labelId] narrows the folder to one of the user's labels. */
+    suspend fun list(folder: MailFolder, query: String, cursor: String? = null, labelId: String? = null): Outcome<InboxPage>
+    suspend fun labels(): Outcome<List<MailLabel>>
+    suspend fun createLabel(name: String): Outcome<MailLabel>
+    /** Adds and removes the user's own labels. Reversible, so it applies immediately. */
+    suspend fun relabel(ids: List<String>, add: List<String>, remove: List<String>): Outcome<Unit>
+    suspend fun attachment(messageId: String, partId: String): Outcome<DownloadedFile>
+    suspend fun attachmentText(messageId: String, partId: String): Outcome<AttachmentText>
     suspend fun read(id: String): Outcome<OpenMessage>
     suspend fun change(id: String, change: MailChange, requestId: String): Outcome<MailChangeReceipt>
     suspend fun saveDraft(draft: ComposeDraft): Outcome<DraftReceipt>

@@ -146,6 +146,7 @@ fun MailActionDto.toDomain() = MailAction(
     summary = summary,
     status = when (status) {
         "pending" -> MailActionStatus.Pending
+        "scheduled" -> MailActionStatus.Scheduled
         "processing" -> MailActionStatus.Processing
         "done" -> MailActionStatus.Done
         "rejected" -> MailActionStatus.Rejected
@@ -159,6 +160,7 @@ fun MailActionDto.toDomain() = MailAction(
     to = to,
     subject = subject,
     messageCount = messageCount,
+    scheduledFor = scheduledFor?.let(::parseInstant),
 )
 
 fun MailActionDetailDto.toDomain() = MailActionDetail(

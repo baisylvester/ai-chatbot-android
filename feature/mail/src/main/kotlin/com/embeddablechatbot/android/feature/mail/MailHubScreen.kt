@@ -38,9 +38,15 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.embeddablechatbot.android.core.designsystem.*
 import com.embeddablechatbot.android.core.domain.mail.*
 import com.embeddablechatbot.android.core.domain.model.ConnectionStatus
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +61,19 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
     var discard by remember { mutableStateOf(false) }
     val accountDescription = stringResource(R.string.hub_account)
     LifecycleResumeEffect(viewModel) { viewModel.refresh(); onPauseOrDispose { } }
-    LaunchedEffect(viewModel) { viewModel.effect.collect { if (it is HubEffect.Review) onApproval(it.id) } }
+    val context = LocalContext.current
+    var labelTarget by remember { mutableStateOf<InboxMessage?>(null) }
+    var newLabel by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(viewModel) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is HubEffect.Review -> onApproval(effect.id)
+                is HubEffect.OpenFile -> openDownloadedFile(context, effect.file)
+            }
+        }
+    }
+    labelTarget?.let { target -> LabelPicker(state.labels, target.labelIds.toSet(), onDismiss = { labelTarget = null }, onApply = { viewModel.setLabels(target, it); labelTarget = null }, onNew = { labelTarget = null; newLabel = true }) }
+    if (newLabel) NewLabelDialog(onDismiss = { newLabel = false }, onCreate = { viewModel.createLabel(it); newLabel = false })
     val closeCompose = { if (!composer.saving) { if (composer.body.isNotBlank() && !composer.uncertain) discard = true else viewModel.closeComposer() } }
     BackHandler(enabled = composer.visible || state.selectedId != null) { if (composer.visible) closeCompose() else viewModel.closeMessage() }
     if (discard) AlertDialog(onDismissRequest = { discard = false }, text = { Text(stringResource(R.string.hub_discard_title)) }, confirmButton = { TextButton(onClick = { discard = false; viewModel.closeComposer() }) { Text(stringResource(R.string.hub_discard)) } }, dismissButton = { TextButton(onClick = { discard = false }) { Text(stringResource(R.string.hub_keep_editing)) } })
@@ -64,7 +82,7 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
         return
     }
     if (state.selectedId != null) {
-        MessageReader(state, viewModel)
+        MessageReader(state, viewModel, onLabels = { labelTarget = it })
         return
     }
     if (writingToolsOnly) {
@@ -80,13 +98,20 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
             Text("Mail Assistant", Modifier.padding(24.dp), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
             state.status?.connection?.email?.let { Text(it, Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodyMedium) }
             Spacer(Modifier.height(20.dp))
-            MailFolder.entries.forEach { folder -> NavigationDrawerItem(label = { Text(folder.title) }, selected = state.folder == folder, onClick = { viewModel.selectTab(HubTab.Mail); viewModel.selectFolder(folder); scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp)) }
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                MailFolder.entries.forEach { folder -> NavigationDrawerItem(label = { Text(folder.title) }, selected = state.labelId == null && state.folder == folder, onClick = { viewModel.selectTab(HubTab.Mail); viewModel.selectFolder(folder); scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp)) }
+                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+                Text(stringResource(R.string.hub_labels), Modifier.padding(horizontal = 28.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                state.labels.forEach { label -> NavigationDrawerItem(label = { Text(label.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, icon = { Text("●", color = labelColor(label)) }, selected = state.labelId == label.id, onClick = { viewModel.selectTab(HubTab.Mail); viewModel.selectLabel(label); scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp)) }
+                NavigationDrawerItem(label = { Text(stringResource(R.string.hub_new_label)) }, icon = { Icon(Icons.Default.Add, null) }, selected = false, onClick = { newLabel = true; scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp))
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = { TopAppBar(
-                title = { Text(when (state.tab) { HubTab.Mail -> if (state.folder in listOf(MailFolder.Inbox,MailFolder.Unread,MailFolder.Starred,MailFolder.Attachments)) stringResource(R.string.hub_inbox) else state.folder.title; HubTab.Writing -> stringResource(R.string.hub_ai); HubTab.Prompts -> stringResource(R.string.hub_prompts) }, fontWeight = FontWeight.SemiBold) },
+                title = { Text(when (state.tab) { HubTab.Mail -> state.labels.firstOrNull { it.id == state.labelId }?.name ?: if (state.folder in listOf(MailFolder.Inbox,MailFolder.Unread,MailFolder.Starred,MailFolder.Attachments)) stringResource(R.string.hub_inbox) else state.folder.title; HubTab.Writing -> stringResource(R.string.hub_ai); HubTab.Prompts -> stringResource(R.string.hub_prompts) }, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = { IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Default.Menu, stringResource(R.string.hub_folders)) } },
                 actions = {
                     if (state.tab == HubTab.Mail) IconButton(onClick = { searchVisible = !searchVisible }) { Icon(Icons.Default.Search, stringResource(R.string.hub_search)) }
@@ -102,7 +127,7 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
             floatingActionButton = { if (state.tab == HubTab.Mail && state.status?.connection?.status == ConnectionStatus.Active) ExtendedFloatingActionButton(onClick = { viewModel.compose() }, icon = { Icon(Icons.Default.Edit, null) }, text = { Text(stringResource(R.string.hub_compose)) }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) },
         ) { padding ->
             when (state.tab) {
-                HubTab.Mail -> InboxBody(state, viewModel, searchVisible, onConnection, Modifier.padding(padding))
+                HubTab.Mail -> InboxBody(state, viewModel, searchVisible, onConnection, Modifier.padding(padding), onLabels = { labelTarget = it })
                 HubTab.Writing -> WritingBody(writer, viewModel, Modifier.padding(padding), onContinue = { onAssistant(it) })
                 HubTab.Prompts -> PromptLibrary(preferences.favoritePrompts, viewModel::toggleFavorite, { onAssistant(it.text) }, Modifier.padding(padding))
             }
@@ -112,12 +137,12 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InboxBody(state: MailHubState, vm: MailHubViewModel, searchVisible: Boolean, onConnection: () -> Unit, modifier: Modifier) {
+private fun InboxBody(state: MailHubState, vm: MailHubViewModel, searchVisible: Boolean, onConnection: () -> Unit, modifier: Modifier, onLabels: (InboxMessage) -> Unit) {
     Column(modifier.fillMaxSize()) {
         if (searchVisible) OutlinedTextField(state.query, vm::query, label = { Text(stringResource(R.string.hub_search)) }, singleLine = true, leadingIcon = { Icon(Icons.Default.Search,null) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { vm.search() }), trailingIcon = { IconButton(onClick = vm::search) { Icon(Icons.Default.Check,"Search") } }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), shape = RoundedCornerShape(24.dp))
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(MailFolder.Inbox to "All mail",MailFolder.Unread to "Unread",MailFolder.Starred to "Starred",MailFolder.Attachments to "Attachments").forEach { (folder,title) -> FilterChip(selected = state.folder == folder, onClick = { vm.selectFolder(folder) }, label = { Text(title) }, shape = RoundedCornerShape(24.dp)) }
+                listOf(MailFolder.Inbox to "All mail",MailFolder.Unread to "Unread",MailFolder.Starred to "Starred",MailFolder.Attachments to "Attachments").forEach { (folder,title) -> FilterChip(selected = state.labelId == null && state.folder == folder, onClick = { vm.selectFolder(folder) }, label = { Text(title) }, shape = RoundedCornerShape(24.dp)) }
             }
             IconButton(onClick = vm::refresh, enabled = !state.loading) { Icon(Icons.Default.Refresh,stringResource(R.string.hub_refresh)) }
         }
@@ -137,7 +162,7 @@ private fun InboxBody(state: MailHubState, vm: MailHubViewModel, searchVisible: 
                         if (!state.changing) when (value) { SwipeToDismissBoxValue.StartToEnd -> vm.change(message,if (message.starred) MailChange.Unstar else MailChange.Star); SwipeToDismissBoxValue.EndToStart -> vm.change(message,MailChange.Archive); else -> Unit }
                         false
                     })
-                    SwipeToDismissBox(state = swipe, backgroundContent = { Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Star,null); Text(stringResource(R.string.hub_archive)) } }, enableDismissFromStartToEnd = !state.changing, enableDismissFromEndToStart = !state.changing) { MessageRow(message, state.changing, { vm.open(message) }, { vm.change(message,it) }) }
+                    SwipeToDismissBox(state = swipe, backgroundContent = { Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer).padding(24.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Star,null); Text(stringResource(R.string.hub_archive)) } }, enableDismissFromStartToEnd = !state.changing, enableDismissFromEndToStart = !state.changing) { MessageRow(message, state.changing, { vm.open(message) }, { vm.change(message,it) }, labels = state.labels.filter { it.id in message.labelIds }, onLabels = { onLabels(message) }) }
                 }
                 if (state.cursor != null) item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TextButton(onClick = vm::more, enabled = !state.loadingMore) { if (state.loadingMore) CircularProgressIndicator(Modifier.size(20.dp)) else Text(stringResource(R.string.hub_load_more)) } } }
             }
@@ -146,7 +171,7 @@ private fun InboxBody(state: MailHubState, vm: MailHubViewModel, searchVisible: 
 }
 
 @Composable
-private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit, change: (MailChange) -> Unit) {
+private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit, change: (MailChange) -> Unit, labels: List<MailLabel> = emptyList(), onLabels: () -> Unit = {}) {
     var menu by remember { mutableStateOf(false) }
     val name = message.from.substringBefore('<').trim().trim('"').ifBlank { message.from }
     Surface(color = MaterialTheme.colorScheme.background) {
@@ -161,6 +186,7 @@ private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit,
                     }
                     Text(message.subject.ifBlank { stringResource(R.string.hub_no_subject) }, fontWeight = if (message.unread) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                     Text(message.snippet, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (labels.isNotEmpty()) LabelChips(labels.take(3), Modifier.padding(top = 4.dp))
                 }
                 Column {
                     IconButton(onClick = { change(if (message.starred) MailChange.Unstar else MailChange.Star) }, enabled = !busy, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Star, stringResource(if (message.starred) R.string.hub_unstar else R.string.hub_star), tint = if (message.starred) Color(0xFFF6AD32) else MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(21.dp)) }
@@ -168,6 +194,7 @@ private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit,
                         IconButton(onClick = { menu = true }, enabled = !busy, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.MoreVert,stringResource(R.string.hub_more),modifier = Modifier.size(20.dp)) }
                         DropdownMenu(menu,{ menu = false }) {
                             listOf((if (message.unread) R.string.hub_mark_read to MailChange.Read else R.string.hub_mark_unread to MailChange.Unread), R.string.hub_archive to MailChange.Archive,R.string.hub_move_inbox to MailChange.Inbox,R.string.hub_spam to MailChange.Spam,R.string.hub_trash to MailChange.Trash).forEach { (label,action) -> DropdownMenuItem(text = { Text(stringResource(label)) },onClick = { menu = false; change(action) }) }
+                            DropdownMenuItem(text = { Text(stringResource(R.string.hub_edit_labels)) }, onClick = { menu = false; onLabels() })
                         }
                     }
                 }
@@ -255,7 +282,7 @@ private fun PromptLibrary(favorites: Set<String>,onFavorite: (String) -> Unit,on
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MessageReader(state: MailHubState,vm: MailHubViewModel) {
+private fun MessageReader(state: MailHubState,vm: MailHubViewModel,onLabels: (InboxMessage) -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text("Message") },navigationIcon = { IconButton(onClick = vm::closeMessage) { Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.hub_back)) } },actions = { state.selected?.let { m -> IconButton(onClick = { vm.change(m.summary,MailChange.Archive) },enabled = !state.changing) { Icon(Icons.Default.Check,stringResource(R.string.hub_archive)) }; IconButton(onClick = { vm.change(m.summary,MailChange.Trash) },enabled = !state.changing) { Icon(Icons.Default.Delete,stringResource(R.string.hub_trash)) } } }) }) { padding ->
         if (state.opening) LoadingState(Modifier.padding(padding),stringResource(R.string.hub_loading))
         else Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -264,6 +291,12 @@ private fun MessageReader(state: MailHubState,vm: MailHubViewModel) {
                 Text(mail.summary.subject.ifBlank { stringResource(R.string.hub_no_subject) },style = MaterialTheme.typography.headlineSmall,fontWeight = FontWeight.SemiBold)
                 Text(mail.summary.from,fontWeight = FontWeight.SemiBold); Text(stringResource(R.string.hub_to_line,mail.to),color = MaterialTheme.colorScheme.onSurfaceVariant,style = MaterialTheme.typography.bodySmall)
                 Text(mail.summary.date,color = MaterialTheme.colorScheme.onSurfaceVariant,style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val labels = state.labels.filter { it.id in mail.summary.labelIds }
+                    if (labels.isNotEmpty()) LabelChips(labels, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { onLabels(mail.summary) }, enabled = !state.changing) { Text("🏷  " + stringResource(R.string.hub_edit_labels)) }
+                }
+                if (mail.attachments.isNotEmpty()) AttachmentList(mail.attachments, state.attachmentBusy, vm::openAttachment, vm::summarizeAttachment)
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(WritingTask.Summary,WritingTask.Translate,WritingTask.Grammar).forEach { task -> OutlinedButton(onClick = { vm.assistMessage(task) }) { Text("✦ ${task.title}") } } }
                 HorizontalDivider(); SelectionContainer { Text(mail.body,style = MaterialTheme.typography.bodyLarge) }
                 if (mail.truncated) StatusBanner(stringResource(R.string.hub_truncated),BannerTone.Warning)
@@ -285,7 +318,8 @@ private fun Composer(state: ComposerState,writer: WriterState,vm: MailHubViewMod
         Column(Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (state.replyId == null) OutlinedTextField(state.to,{ vm.editComposer(to = it) },label = { Text(stringResource(R.string.hub_to)) },singleLine = true,enabled = !state.saving && !state.uncertain,keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),modifier = Modifier.fillMaxWidth())
             OutlinedTextField(state.subject,{ vm.editComposer(subject = it) },label = { Text(stringResource(R.string.hub_subject)) },singleLine = true,enabled = !state.saving && !state.uncertain,modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(state.body,{ vm.editComposer(body = it) },placeholder = { Text(stringResource(R.string.hub_message)) },enabled = !state.saving && !state.uncertain,modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp))
+            ComposerBody(state, vm)
+            ComposerAttachments(state, vm)
             Text(stringResource(R.string.hub_draft_safety),style = MaterialTheme.typography.bodySmall,color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let { StatusBanner(it.message(),BannerTone.Error) }
             if (state.uncertain) StatusBanner(stringResource(R.string.hub_draft_uncertain),BannerTone.Warning,actionLabel = stringResource(R.string.hub_check_drafts),onAction = { vm.closeComposer(); vm.selectFolder(MailFolder.Drafts); vm.selectTab(HubTab.Mail) })

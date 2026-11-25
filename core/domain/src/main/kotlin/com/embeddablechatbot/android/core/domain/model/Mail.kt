@@ -31,9 +31,12 @@ data class PendingConnect(val transactionId: String, val verifier: String, val e
 enum class MailActionKind { Send, Trash }
 
 enum class MailActionStatus {
-    Pending, Processing, Done, Rejected, Failed, Uncertain, Unknown;
+    Pending, Scheduled, Processing, Done, Rejected, Failed, Uncertain, Unknown;
 
+    /** Waiting for a decision: only these can be approved. */
     val isOpen: Boolean get() = this == Pending
+    /** Can still be declined: waiting, or approved for a later time and not yet sent. */
+    val canDecline: Boolean get() = this == Pending || this == Scheduled
 }
 
 data class MailAction(
@@ -47,6 +50,8 @@ data class MailAction(
     val to: String?,
     val subject: String?,
     val messageCount: Int?,
+    /** When an approved, scheduled email is due. */
+    val scheduledFor: Instant? = null,
 )
 
 data class Attachment(val filename: String, val mimeType: String, val size: Long)

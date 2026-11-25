@@ -145,7 +145,7 @@ class MailViewModel @Inject constructor(
     }
 }
 
-enum class ApprovalNotice { Stale, AlreadyHandled, Done, Rejected, Failed, Uncertain }
+enum class ApprovalNotice { Stale, AlreadyHandled, Done, Rejected, Failed, Uncertain, Scheduled, Unscheduled }
 
 data class ApprovalUiState(
     val loading: Boolean = true,
@@ -189,6 +189,21 @@ class ApprovalViewModel @Inject constructor(
         }
     }
 
+    /** Approves exactly the version on screen for sending at [sendAt]; the server sends it when due. */
+    fun schedule(sendAt: java.time.Instant) {
+        val detail = _state.value.detail ?: return
+        if (_state.value.working || !detail.canApprove) return
+        _state.update { it.copy(working = true, error = null, notice = null) }
+        viewModelScope.launch { handle(review.approve(detail, sendAt)) }
+    }
+
+    fun unschedule() {
+        val detail = _state.value.detail ?: return
+        if (_state.value.working) return
+        _state.update { it.copy(working = true, error = null, notice = null) }
+        viewModelScope.launch { handle(review.unschedule(detail)) }
+    }
+
     fun reject() {
         val detail = _state.value.detail ?: return
         if (_state.value.working) return
@@ -204,6 +219,8 @@ class ApprovalViewModel @Inject constructor(
                     MailActionStatus.Done -> ApprovalNotice.Done
                     MailActionStatus.Rejected -> ApprovalNotice.Rejected
                     MailActionStatus.Uncertain -> ApprovalNotice.Uncertain
+                    MailActionStatus.Scheduled -> ApprovalNotice.Scheduled
+                    MailActionStatus.Pending -> ApprovalNotice.Unscheduled
                     else -> ApprovalNotice.Failed
                 }
                 load(notice)

@@ -62,7 +62,12 @@ class MailHubScreenTest {
         val writes=mutableListOf<WritingRequest>(); val drafts=mutableListOf<ComposeDraft>()
         var showMessage=false; private var reads=0
         private val message=InboxMessage("m1","t1","Ana","Test message","","A test preview",true,false)
-        override suspend fun list(folder:MailFolder,query:String,cursor:String?)=Outcome.Ok(InboxPage(if(showMessage) listOf(message) else emptyList(),null))
+        override suspend fun list(folder:MailFolder,query:String,cursor:String?,labelId:String?)=Outcome.Ok(InboxPage(if(showMessage) listOf(message) else emptyList(),null))
+        override suspend fun labels():Outcome<List<MailLabel>> = Outcome.Ok(emptyList())
+        override suspend fun createLabel(name:String):Outcome<MailLabel> = Outcome.Ok(MailLabel("Label_1",name))
+        override suspend fun relabel(ids:List<String>,add:List<String>,remove:List<String>):Outcome<Unit> = Outcome.Ok(Unit)
+        override suspend fun attachment(messageId:String,partId:String):Outcome<DownloadedFile> = Outcome.Err(AppError.NotFound("Missing"))
+        override suspend fun attachmentText(messageId:String,partId:String):Outcome<AttachmentText> = Outcome.Err(AppError.NotFound("Missing"))
         override suspend fun read(id:String):Outcome<OpenMessage> = if(reads++==0) Outcome.Err(AppError.Network(false)) else Outcome.Ok(OpenMessage(message,"me@example.test","Recovered message body",false))
         override suspend fun change(id:String,change:MailChange,requestId:String)=Outcome.Ok(MailChangeReceipt(null,false))
         override suspend fun saveDraft(draft:ComposeDraft):Outcome<DraftReceipt> {drafts+=draft;return Outcome.Ok(DraftReceipt("d","a",draft.to,draft.subject))}

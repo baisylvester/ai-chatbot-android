@@ -122,20 +122,29 @@ sealed interface ApprovalResult {
 class ReviewMailActionUseCase @Inject constructor(private val repository: MailRepository) {
     private val inFlight = Mutex()
 
-    suspend fun approve(reviewed: MailActionDetail): ApprovalResult {
+    /** [sendAt] schedules an email instead of sending it now. Trash requests cannot be scheduled. */
+    suspend fun approve(reviewed: MailActionDetail, sendAt: java.time.Instant? = null): ApprovalResult {
         val version = reviewed.version
         if (!reviewed.canApprove || version == null) return ApprovalResult.Stale
+        if (sendAt != null && reviewed.action.kind != com.embeddablechatbot.android.core.domain.model.MailActionKind.Send) {
+            return ApprovalResult.Failed(AppError.Invalid("Only emails can be scheduled."))
+        }
         if (!inFlight.tryLock()) return ApprovalResult.AlreadyHandled
         try {
-            return mapResult(repository.approve(reviewed.action.id, version))
+            return mapResult(repository.approve(reviewed.action.id, version, sendAt))
         } finally {
             inFlight.unlock()
         }
     }
 
     suspend fun reject(reviewed: MailActionDetail): ApprovalResult {
-        if (!reviewed.action.status.isOpen) return ApprovalResult.AlreadyHandled
+        if (!reviewed.action.status.canDecline) return ApprovalResult.AlreadyHandled
         return inFlight.withLock { mapResult(repository.reject(reviewed.action.id)) }
+    }
+
+    suspend fun unschedule(reviewed: MailActionDetail): ApprovalResult {
+        if (reviewed.action.status != com.embeddablechatbot.android.core.domain.model.MailActionStatus.Scheduled) return ApprovalResult.AlreadyHandled
+        return inFlight.withLock { mapResult(repository.unschedule(reviewed.action.id)) }
     }
 
     private fun mapResult(result: Outcome<MailAction>): ApprovalResult = when (result) {

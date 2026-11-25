@@ -110,6 +110,7 @@ Use a disposable test account and a test Gmail mailbox. Never use production dat
 | Gmail connect (system browser, single-use transaction, PKCE, device verifier), status, disconnect | Implemented, unit-tested (Android + backend). Real Google consent and Gmail connection verified with the requested account |
 | Approvals: full review, version-bound approve, reject, stale, already-handled, uncertain | Implemented, unit + instrumented tested. Real Gmail draft review and decline verified; no real send or Trash executed |
 | Approval reminders (WorkManager, ~30 min, best effort) | Implemented, not automatically tested |
+| Labels (browse, create, apply), attachment open/summarize, attaching files, formatted email, scheduled send | Implemented 25 November 2026; backend and Android unit tests pass. Migration applied and deployed to the live service on 25 November 2026; not yet exercised on a device or against real Gmail. See [capabilities](docs/MAIL_ASSISTANT_CAPABILITIES.md) |
 | Native push (FCM) | **Not implemented**: needs a Firebase project and a server-side sender |
 | Share-to-app text import | Implemented as a draft in a new chat; the user sends it deliberately |
 | End-to-end against a deployed backend | Authenticated private-assistant setup, Gmail status, Inbox read and AI writing passed on the physical phone against live HTTPS on 20 November 2026 without ADB reverse. Fresh-account email delivery/verification remains unverified |

@@ -53,6 +53,8 @@ object HttpErrors {
             410 -> AppError.Gone(reason, message)
             429 -> AppError.RateLimited(retryAfterSeconds(retryAfter, now))
             503 -> AppError.Unavailable(reason, message)
+            // Other 4xx answers (413, 415, 422…) are definite refusals: show the server's explanation.
+            in 400..499 -> if (reason != null && reason != ErrorReason.Unknown) AppError.Conflict(reason, message) else AppError.Invalid(message)
             else -> AppError.Server(status, message)
         }
     }

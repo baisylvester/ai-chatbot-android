@@ -154,6 +154,7 @@ data class MailActionDto(
     val to: String? = null,
     val subject: String? = null,
     val messageCount: Int? = null,
+    val scheduledFor: String? = null,
 )
 
 @Serializable
@@ -199,7 +200,7 @@ data class MailActionDetailDto(
 )
 
 @Serializable
-data class ApproveBody(val version: String)
+data class ApproveBody(val version: String, val sendAt: String? = null)
 
 // ---- Supabase Auth (GoTrue) ----
 
