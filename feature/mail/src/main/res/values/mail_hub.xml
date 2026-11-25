@@ -15,4 +15,24 @@
     <string name="hub_reply">Reply</string><string name="hub_forward">Forward</string><string name="hub_summary">Summary</string><string name="hub_translate">Translate</string><string name="hub_archive">Archive</string><string name="hub_star">Add star</string><string name="hub_unstar">Remove star</string><string name="hub_mark_read">Mark read</string><string name="hub_mark_unread">Mark unread</string><string name="hub_move_inbox">Move to inbox</string><string name="hub_spam">Move to spam</string><string name="hub_trash">Move to Trash…</string>
     <string name="hub_truncated">This message is long. The displayed text is truncated.</string><string name="hub_no_subject">(No subject)</string><string name="hub_to_line">To: %1$s</string><string name="hub_review">Review</string>
     <plurals name="hub_approval_count"><item quantity="one">%1$d action waiting for your approval</item><item quantity="other">%1$d actions waiting for your approval</item></plurals>
+    <string name="hub_labels">Labels</string>
+    <string name="hub_apply_labels">Apply</string>
+    <string name="hub_new_label">New label</string>
+    <string name="hub_label_name">Label name</string>
+    <string name="hub_create">Create</string>
+    <string name="hub_edit_labels">Labels</string>
+    <string name="hub_no_labels">You have no labels yet.</string>
+    <string name="hub_attachments">Attachments (%1$d)</string>
+    <string name="hub_open">Open</string>
+    <string name="hub_summarize">Summarize</string>
+    <string name="hub_no_viewer">No app on this device can open this file.</string>
+    <string name="hub_formatted">Formatted email (bold, italic, lists, links)</string>
+    <string name="hub_formatted_hint">Formatting uses **bold**, *italic*, - lists and [text](https://link). Recipients see the formatted version; review shows the plain-text copy.</string>
+    <string name="hub_bullets">Bulleted list</string>
+    <string name="hub_numbers">Numbered list</string>
+    <string name="hub_link">Link</string>
+    <string name="hub_attach">Attach files</string>
+    <string name="hub_attach_total">Attachments: %1$s of 10 MB</string>
+    <string name="hub_attach_failed">Could not attach %1$s. Files can total at most 10 MB.</string>
+    <string name="hub_remove_attachment">Remove %1$s</string>
 </resources>

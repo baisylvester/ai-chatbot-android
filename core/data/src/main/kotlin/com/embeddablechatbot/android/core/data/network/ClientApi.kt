@@ -150,9 +150,19 @@ class ClientApi @Inject constructor(
 
     // ---- Native mail API ----
 
-    suspend fun inbox(folder: String, query: String, cursor: String?) = get("/mail/messages", buildMap {
-        put("chatbotId", config.config.value.chatbotId); put("folder", folder); put("query", query); cursor?.let { put("cursor", it) }
+    suspend fun inbox(folder: String, query: String, cursor: String?, labelId: String? = null) = get("/mail/messages", buildMap {
+        put("chatbotId", config.config.value.chatbotId); put("folder", folder); put("query", query); cursor?.let { put("cursor", it) }; labelId?.let { put("labelId", it) }
     }, InboxPageDto.serializer())
+    suspend fun mailLabels() = get("/mail/labels", mapOf("chatbotId" to config.config.value.chatbotId), MailLabelListDto.serializer())
+    suspend fun createMailLabel(name: String) = send("POST", mailboxPath("labels"), ApiJson.encodeToString(CreateLabelBody.serializer(), CreateLabelBody(name)), MailLabelDto.serializer(), idempotent = false)
+    /** Setting the same labels twice has the same result, so a retry is safe. */
+    suspend fun relabel(body: RelabelBody) = send("POST", mailboxPath("labels/apply"), ApiJson.encodeToString(RelabelBody.serializer(), body), OkDto.serializer(), idempotent = true)
+    suspend fun attachmentBytes(messageId: String, partId: String): Outcome<Authed<Pair<String, ByteArray>>> =
+        execute("GET", url("/mail/messages/${seg(messageId)}/attachments/${seg(partId)}", mapOf("chatbotId" to config.config.value.chatbotId)), null, idempotent = true, longClient, accept = "*/*") {
+            (it.header("Content-Type") ?: "application/octet-stream").substringBefore(';').trim() to it.body.bytes()
+        }
+    suspend fun attachmentText(messageId: String, partId: String) =
+        get("/mail/messages/${seg(messageId)}/attachments/${seg(partId)}/text", mapOf("chatbotId" to config.config.value.chatbotId), AttachmentTextDto.serializer())
     suspend fun inboxMessage(id: String) = get("/mail/messages/${seg(id)}", mapOf("chatbotId" to config.config.value.chatbotId), OpenMessageDto.serializer())
     private fun mailboxPath(path: String) = "/mail/$path?chatbotId=${seg(config.config.value.chatbotId)}"
     suspend fun changeMail(body: ChangeMailBody) = send("POST", mailboxPath("modify"), ApiJson.encodeToString(ChangeMailBody.serializer(), body), ChangeMailDto.serializer(), idempotent = false)
@@ -174,11 +184,14 @@ class ClientApi @Inject constructor(
     suspend fun mailAction(id: String) = get("/mail/actions/${seg(id)}", emptyMap(), MailActionDetailDto.serializer())
 
     /** Not idempotent from the client's view: never retried automatically. The server enforces single use. */
-    suspend fun approve(id: String, version: String) =
-        send("POST", "/mail/actions/${seg(id)}/approve", ApiJson.encodeToString(ApproveBody.serializer(), ApproveBody(version)), MailActionResultDto.serializer(), idempotent = false, slow = true)
+    suspend fun approve(id: String, version: String, sendAt: String? = null) =
+        send("POST", "/mail/actions/${seg(id)}/approve", ApiJson.encodeToString(ApproveBody.serializer(), ApproveBody(version, sendAt)), MailActionResultDto.serializer(), idempotent = false, slow = true)
 
     suspend fun reject(id: String) =
         send("POST", "/mail/actions/${seg(id)}/reject", "{}", MailActionResultDto.serializer(), idempotent = true)
+
+    suspend fun unschedule(id: String) =
+        send("POST", "/mail/actions/${seg(id)}/unschedule", "{}", MailActionResultDto.serializer(), idempotent = true)
 
     // ---- plumbing ----
 

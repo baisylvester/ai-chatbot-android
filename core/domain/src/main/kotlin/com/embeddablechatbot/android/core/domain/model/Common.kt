@@ -38,6 +38,12 @@ enum class ErrorReason(val wire: String) {
     DraftMissing("draft_missing"),
     ActionNotFound("action_not_found"),
     MailboxRevoked("mailbox_revoked"),
+    AttachmentUnsupported("attachment_unsupported"),
+    AttachmentUnreadable("attachment_unreadable"),
+    AttachmentTooLarge("attachment_too_large"),
+    AttachmentInvalid("attachment_invalid"),
+    LabelExists("label_exists"),
+    ScheduleInvalid("schedule_invalid"),
     Unknown("unknown");
 
     companion object {

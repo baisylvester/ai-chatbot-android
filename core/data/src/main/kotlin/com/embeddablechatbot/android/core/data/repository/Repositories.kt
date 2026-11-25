@@ -150,7 +150,8 @@ class MailRepositoryImpl @Inject constructor(private val api: ClientApi) : MailR
     override suspend fun actions(filter: ActionFilter): Outcome<List<MailAction>> =
         api.mailActions(filter.name.lowercase()).map { r -> r.value.actions.map { it.toDomain() } }
     override suspend fun actionDetail(id: String): Outcome<MailActionDetail> = api.mailAction(id).map { it.value.toDomain() }
-    override suspend fun approve(id: String, version: String): Outcome<MailAction> = api.approve(id, version).map { it.value.action.toDomain() }
+    override suspend fun approve(id: String, version: String, sendAt: java.time.Instant?): Outcome<MailAction> = api.approve(id, version, sendAt?.toString()).map { it.value.action.toDomain() }
+    override suspend fun unschedule(id: String): Outcome<MailAction> = api.unschedule(id).map { it.value.action.toDomain() }
     override suspend fun reject(id: String): Outcome<MailAction> = api.reject(id).map { it.value.action.toDomain() }
 }
 

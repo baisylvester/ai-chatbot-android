@@ -95,6 +95,63 @@ class MailHubViewModelTest {
         assertEquals("Edited body",vm.composer.value.body)
     }
 
+    @Test fun `labels load with the mailbox and browsing a label narrows the list`() = runTest(dispatcher) {
+        val vm=vm(); runCurrent()
+        assertEquals(listOf("Clients","Travel"),vm.state.value.labels.map{it.name})
+        vm.selectLabel(MailLabel("Label_1","Clients")); runCurrent()
+        assertEquals("Label_1",inbox.labelLists.last()); assertEquals(MailFolder.All,vm.state.value.folder)
+        vm.selectFolder(MailFolder.Inbox); runCurrent()
+        assertNull(inbox.labelLists.last()); assertNull(vm.state.value.labelId)
+    }
+    @Test fun `a failed label load keeps the mailbox usable`() = runTest(dispatcher) {
+        inbox.labelsResult=Outcome.Err(AppError.Network(false))
+        inbox.pages += Outcome.Ok(InboxPage(listOf(message("one")),null))
+        val vm=vm(); runCurrent()
+        assertTrue(vm.state.value.loaded); assertNull(vm.state.value.error); assertTrue(vm.state.value.labels.isEmpty())
+    }
+    @Test fun `editing labels sends only the difference`() = runTest(dispatcher) {
+        val msg=message("one").copy(labelIds=listOf("Label_1"))
+        inbox.pages += Outcome.Ok(InboxPage(listOf(msg),null))
+        val vm=vm(); runCurrent()
+        vm.setLabels(msg,setOf("Label_1")); runCurrent()
+        assertTrue(inbox.relabels.isEmpty())
+        vm.setLabels(msg,setOf("Label_2")); runCurrent()
+        assertEquals(Triple(listOf("one"),listOf("Label_2"),listOf("Label_1")),inbox.relabels.single())
+        assertEquals(listOf("Label_2"),vm.state.value.messages.single().labelIds)
+    }
+    @Test fun `attachments are limited to ten megabytes and ten files`() = runTest(dispatcher) {
+        val vm=vm(); runCurrent(); vm.compose("ana@example.test","Files","See attached")
+        vm.addAttachment("big.bin","application/octet-stream",ByteArray(6*1024*1024))
+        vm.addAttachment("big2.bin","application/octet-stream",ByteArray(5*1024*1024))
+        assertEquals(1,vm.composer.value.attachments.size); assertTrue(vm.composer.value.error is AppError.Invalid)
+        vm.addAttachment("empty.txt","text/plain",ByteArray(0)); assertEquals(1,vm.composer.value.attachments.size)
+        vm.addAttachment("big.bin","application/octet-stream",ByteArray(6*1024*1024)); assertEquals(1,vm.composer.value.attachments.size) // same file twice
+        vm.removeAttachment(vm.composer.value.attachments.single().id); assertTrue(vm.composer.value.attachments.isEmpty())
+        repeat(11){ vm.addAttachment("f$it.txt","text/plain",byteArrayOf(1)) }
+        assertEquals(OutgoingAttachment.MAX_FILES,vm.composer.value.attachments.size)
+    }
+    @Test fun `formatted drafts carry their files and format to the server`() = runTest(dispatcher) {
+        val vm=vm(); runCurrent(); vm.compose("ana@example.test","Report","Hello team")
+        val selection=vm.formatBody(0,5,TextStyleMark.Bold)
+        assertEquals("**Hello** team",vm.composer.value.body); assertEquals(2 to 7,selection); assertTrue(vm.composer.value.formatted)
+        vm.addAttachment("report.pdf","application/pdf",byteArrayOf(1,2,3)); vm.saveDraft(); runCurrent()
+        val draft=inbox.drafts.single()
+        assertTrue(draft.formatted); assertEquals("report.pdf",draft.attachments.single().filename)
+    }
+    @Test fun `summarizing an attachment opens the summary tool with its text`() = runTest(dispatcher) {
+        inbox.readResult=Outcome.Ok(OpenMessage(message("one"),"me@example.test","Body",false,listOf(MessageAttachment("1","terms.pdf","application/pdf",10))))
+        val vm=vm(); runCurrent(); vm.open(message("one")); runCurrent()
+        vm.summarizeAttachment(vm.state.value.selected!!.attachments.single()); runCurrent()
+        assertEquals(HubTab.Writing,vm.state.value.tab); assertEquals(WritingTask.Summary,inbox.writes.single().operation)
+        assertEquals("Contract terms",inbox.writes.single().text)
+    }
+    @Test fun `opening an attachment emits the file with its real name`() = runTest(dispatcher) {
+        inbox.readResult=Outcome.Ok(OpenMessage(message("one"),"me@example.test","Body",false,listOf(MessageAttachment("1","terms.pdf","application/pdf",10))))
+        val vm=vm(); runCurrent(); vm.open(message("one")); runCurrent()
+        vm.openAttachment(vm.state.value.selected!!.attachments.single()); runCurrent()
+        vm.effect.test { val effect=awaitItem() as HubEffect.OpenFile; assertEquals("terms.pdf",effect.file.filename) }
+    }
+
     private fun message(id:String)=InboxMessage(id,"thread","Ana <ana@example.test>","Hello","","Preview",true,false)
     private class TestInbox : InboxRepository {
         val pages=ArrayDeque<Outcome<InboxPage>>()
@@ -105,7 +162,17 @@ class MailHubViewModelTest {
         var draftGate: CompletableDeferred<Unit>?=null
         var readResult: Outcome<OpenMessage> = Outcome.Err(AppError.NotFound("Missing"))
         var draftResult: Outcome<DraftReceipt> = Outcome.Ok(DraftReceipt("draft","action","ana@example.test","Hello"))
-        override suspend fun list(folder:MailFolder,query:String,cursor:String?):Outcome<InboxPage> {
+        val labelLists=mutableListOf<String?>()
+        val relabels=mutableListOf<Triple<List<String>,List<String>,List<String>>>()
+        var labelsResult: Outcome<List<MailLabel>> = Outcome.Ok(listOf(MailLabel("Label_1","Clients"),MailLabel("Label_2","Travel")))
+        var textResult: Outcome<AttachmentText> = Outcome.Ok(AttachmentText("terms.pdf","Contract terms",false))
+        override suspend fun labels()=labelsResult
+        override suspend fun createLabel(name:String):Outcome<MailLabel> = Outcome.Ok(MailLabel("Label_9",name))
+        override suspend fun relabel(ids:List<String>,add:List<String>,remove:List<String>):Outcome<Unit> {relabels+=Triple(ids,add,remove); return Outcome.Ok(Unit)}
+        override suspend fun attachment(messageId:String,partId:String):Outcome<DownloadedFile> = Outcome.Ok(DownloadedFile(partId,"application/pdf",byteArrayOf(1,2)))
+        override suspend fun attachmentText(messageId:String,partId:String)=textResult
+        override suspend fun list(folder:MailFolder,query:String,cursor:String?,labelId:String?):Outcome<InboxPage> {
+            labelLists += labelId
             lists += Triple(folder,query,cursor)
             val gate=firstPage; firstPage=null
             return gate?.await() ?: pages.removeFirstOrNull() ?: Outcome.Ok(InboxPage(emptyList(),null))
