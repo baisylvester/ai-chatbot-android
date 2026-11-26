@@ -78,6 +78,8 @@ interface InboxRepository {
     suspend fun pinned(): Outcome<List<InboxMessage>> = Outcome.Ok(emptyList())
     suspend fun pin(id: String): Outcome<Unit> = Outcome.Ok(Unit)
     suspend fun unpin(id: String): Outcome<Unit> = Outcome.Ok(Unit)
+    /** Deletes the offline copy (another mailbox was selected). */
+    suspend fun clearOfflineCopy() {}
     /** People from the user's recent mail, most frequent first; the app filters them while typing. */
     suspend fun contacts(): Outcome<List<MailContact>> = Outcome.Ok(emptyList())
 }

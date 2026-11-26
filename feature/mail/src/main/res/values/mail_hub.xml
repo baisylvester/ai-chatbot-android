@@ -51,4 +51,6 @@
     <string name="hub_everything_else">Everything else</string>
     <string name="hub_offline_copy">You are offline. Showing mail saved on this phone (%1$s). Actions need a connection.</string>
     <string name="hub_offline_message">Offline copy saved on this phone. Actions need a connection.</string>
+    <string name="hub_mailboxes">Mailboxes</string>
+    <string name="hub_add_mailbox">Add or manage mailboxes</string>
 </resources>

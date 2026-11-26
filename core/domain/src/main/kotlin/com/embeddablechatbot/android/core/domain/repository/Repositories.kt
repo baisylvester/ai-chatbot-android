@@ -9,6 +9,8 @@ import com.embeddablechatbot.android.core.domain.model.Conversation
 import com.embeddablechatbot.android.core.domain.model.MailAction
 import com.embeddablechatbot.android.core.domain.model.MailActionDetail
 import com.embeddablechatbot.android.core.domain.model.MailStatus
+import com.embeddablechatbot.android.core.domain.model.ConnectTarget
+import com.embeddablechatbot.android.core.domain.model.ImapServers
 import com.embeddablechatbot.android.core.domain.model.Message
 import com.embeddablechatbot.android.core.domain.model.Outcome
 import com.embeddablechatbot.android.core.domain.model.PendingConnect
@@ -107,6 +109,18 @@ interface ConversationRepository {
 interface MailRepository {
     suspend fun status(chatbotId: String): Outcome<MailStatus>
     suspend fun startConnect(chatbotId: String, verifierChallenge: String): Outcome<ConnectLaunch>
+    /** Starts a browser sign-in for another kind of account (Outlook mailbox, Google Calendar). */
+    suspend fun startConnect(chatbotId: String, verifierChallenge: String, target: ConnectTarget): Outcome<ConnectLaunch> = startConnect(chatbotId, verifierChallenge)
+    /** Connects an IMAP mailbox with an app password; the server checks it by signing in once. */
+    suspend fun connectImap(chatbotId: String, email: String, appPassword: String, servers: ImapServers = ImapServers()): Outcome<Unit> = Outcome.Ok(Unit)
+    /** Makes another connected mailbox the selected one (inbox, assistant, approvals). */
+    suspend fun selectMailbox(mailboxId: String): Outcome<Unit> = Outcome.Ok(Unit)
+    /** Disconnects one mailbox; the others stay connected. */
+    suspend fun disconnect(mailboxId: String): Outcome<Unit> = disconnect()
+    suspend fun disconnectCalendar(): Outcome<Unit> = Outcome.Ok(Unit)
+    /** Registers or removes this phone's push token for new-mail notifications. */
+    suspend fun registerPush(token: String): Outcome<Unit> = Outcome.Ok(Unit)
+    suspend fun unregisterPush(token: String): Outcome<Unit> = Outcome.Ok(Unit)
     suspend fun completeConnect(transactionId: String, code: String, verifier: String): Outcome<MailStatus>
     suspend fun disconnect(): Outcome<Unit>
     suspend fun actions(filter: ActionFilter): Outcome<List<MailAction>>

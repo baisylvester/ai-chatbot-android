@@ -101,14 +101,33 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
         // Narrower than a phone screen so the scrim stays visible and tappable to close it.
         ModalDrawerSheet(Modifier.widthIn(max = 296.dp).fillMaxWidth(0.82f)) {
             Text("Mail Assistant", Modifier.padding(24.dp), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            state.status?.connection?.email?.let { Text(it, Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodyMedium) }
-            Spacer(Modifier.height(20.dp))
+            val mailboxes = state.status?.mailboxes.orEmpty()
+            if (mailboxes.size <= 1) state.status?.connection?.email?.let { Text(it, Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodyMedium) }
+            Spacer(Modifier.height(12.dp))
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                // Several mailboxes: each one is a row; choosing one switches the inbox and the assistant.
+                if (mailboxes.size > 1) {
+                    Text(stringResource(R.string.hub_mailboxes), Modifier.padding(horizontal = 28.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    mailboxes.forEach { box ->
+                        NavigationDrawerItem(
+                            label = { Column { Text(box.email, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(box.providerName, style = MaterialTheme.typography.labelSmall) } },
+                            icon = { Icon(if (box.selected) Icons.Default.Check else Icons.Default.Email, null) },
+                            selected = box.selected,
+                            onClick = { viewModel.switchMailbox(box.id); scope.launch { drawer.close() } },
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                    }
+                }
+                NavigationDrawerItem(label = { Text(stringResource(R.string.hub_add_mailbox)) }, icon = { Icon(Icons.Default.Add, null) }, selected = false, onClick = { scope.launch { drawer.close() }; onConnection() }, modifier = Modifier.padding(horizontal = 12.dp))
+                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 MailFolder.entries.forEach { folder -> NavigationDrawerItem(label = { Text(folder.title) }, selected = state.labelId == null && state.folder == folder, onClick = { viewModel.selectTab(HubTab.Mail); viewModel.selectFolder(folder); scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp)) }
                 HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+                // IMAP mailboxes have folders only: no labels section.
+                if (state.status?.selectedMailbox?.supportsLabels != false) {
                 Text(stringResource(R.string.hub_labels), Modifier.padding(horizontal = 28.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 state.labels.forEach { label -> NavigationDrawerItem(label = { Text(label.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, icon = { Text("●", color = labelColor(label)) }, badge = { IconButton(onClick = { editLabel = label; scope.launch { drawer.close() } }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Edit, stringResource(R.string.hub_label_actions, label.name), Modifier.size(18.dp)) } }, selected = state.labelId == label.id, onClick = { viewModel.selectTab(HubTab.Mail); viewModel.selectLabel(label); scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp)) }
                 NavigationDrawerItem(label = { Text(stringResource(R.string.hub_new_label)) }, icon = { Icon(Icons.Default.Add, null) }, selected = false, onClick = { newLabel = true; scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp))
+                }
                 Spacer(Modifier.height(16.dp))
             }
         }

@@ -8,7 +8,7 @@
     <string name="mail_connected_as">Connected to Gmail as %1$s</string>
     <string name="mail_revoked">Gmail access for %1$s expired or was revoked.</string>
     <string name="mail_not_connected">Gmail is not connected.</string>
-    <string name="mail_explain">The assistant uses Google\'s Gmail API with the permission you grant in your browser. It never reads other apps\' data. It can search, read, sort and draft on its own; sending and moving to Trash always wait for your approval here or on the web.</string>
+    <string name="mail_explain">The assistant works in the mailbox marked In use: Gmail and Outlook with the permission you grant in your browser, other providers with an app password. It never reads other apps\x27 data. It can search, read, sort and draft on its own; sending and moving to Trash always wait for your approval here or on the web.</string>
     <string name="mail_connect">Connect Gmail</string>
     <string name="mail_reconnect">Reconnect Gmail</string>
     <string name="mail_disconnect">Disconnect</string>
@@ -16,7 +16,7 @@
     <string name="mail_cancel">Cancel</string>
     <string name="mail_not_configured">Gmail is not set up on this server yet. Ask the platform administrator.</string>
     <string name="mail_role_required">Mailbox tools are available to owners and admins of this chatbot\'s organization. Your role doesn\'t include them.</string>
-    <string name="mail_connected_notice">Gmail is connected.</string>
+    <string name="mail_connected_notice">Mailbox connected.</string>
     <string name="mail_disconnected_notice">Gmail was disconnected.</string>
     <string name="mail_ignored_notice">That sign-in link didn\'t match a connection started on this device, so nothing changed.</string>
     <string name="mail_pending">Waiting for your approval</string>
@@ -81,4 +81,27 @@
     <string name="review_unscheduled_notice">Schedule cancelled. The email is waiting for your approval again.</string>
     <string name="review_scheduled_info">You approved this email for later. It has not been sent. You can still cancel the schedule or keep it as a draft.</string>
     <string name="review_unschedule">Cancel schedule</string>
+    <string name="mail_mailboxes">Mailboxes</string>
+    <string name="mail_add">Add a mailbox</string>
+    <string name="mail_connect_outlook">Connect Outlook or Microsoft 365</string>
+    <string name="mail_connect_imap">Connect Yahoo, iCloud or other (IMAP)</string>
+    <string name="mail_in_use">In use</string>
+    <string name="mail_use_this">Use this mailbox</string>
+    <string name="mail_switched_notice">Switched mailbox. The inbox and the assistant now use it.</string>
+    <string name="mail_disconnect_one_confirm">Disconnect %1$s? Its waiting approval requests and pins are removed. Your email stays with your provider.</string>
+    <string name="mail_imap_explain">Use an app password, not your normal password. Create one in your provider\'s security settings (Yahoo: Account security → Generate app password; iCloud: appleid.apple.com → App-Specific Passwords). The server checks it once and keeps it encrypted.</string>
+    <string name="mail_imap_email">Email address</string>
+    <string name="mail_imap_password">App password</string>
+    <string name="mail_imap_servers">Enter server names (other providers)</string>
+    <string name="mail_imap_hide_servers">Hide server names</string>
+    <string name="mail_imap_host">IMAP server (port 993)</string>
+    <string name="mail_smtp_host">SMTP server</string>
+    <string name="mail_smtp_587">SMTP uses port 587 (STARTTLS) instead of 465</string>
+    <string name="mail_imap_connect">Connect</string>
+    <string name="mail_calendar">Google Calendar</string>
+    <string name="mail_calendar_explain">Optional. Lets the assistant see when you are busy and hold time on your own calendar. Held events have no guests, so nobody is notified; invitations go out as an email you approve.</string>
+    <string name="mail_calendar_connected">Connected as %1$s</string>
+    <string name="mail_calendar_connect">Connect Google Calendar</string>
+    <string name="mail_calendar_disconnect">Disconnect calendar</string>
+    <string name="mail_calendar_disconnected">Google Calendar was disconnected.</string>
 </resources>

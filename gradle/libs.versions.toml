@@ -24,6 +24,7 @@ androidxTestRunner = "1.7.0"
 espresso = "3.7.0"
 
 [libraries]
+firebase-messaging = { module = "com.google.firebase:firebase-messaging", version = "24.1.1" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }

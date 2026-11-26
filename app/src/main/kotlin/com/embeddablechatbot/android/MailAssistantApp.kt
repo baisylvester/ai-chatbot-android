@@ -30,6 +30,7 @@ class AppStartup @Inject constructor(
     private val auth: AuthRepository,
     private val lifecycle: AccountLifecycle,
     private val reminders: ReminderScheduler,
+    private val push: com.embeddablechatbot.android.push.MailPush,
     @param:ApplicationScope private val scope: CoroutineScope,
 ) {
     private val ready = CompletableDeferred<Unit>()
@@ -41,6 +42,7 @@ class AppStartup @Inject constructor(
             ready.complete(Unit)
             launch { lifecycle.run() }
             launch { reminders.run() }
+            launch { push.run() }
         }
     }
 
@@ -60,6 +62,12 @@ class MailAssistantApp : Application(), Configuration.Provider {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL_APPROVALS, getString(R.string.notification_channel_approvals), NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = getString(R.string.notification_channel_approvals_desc)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
+            },
+        )
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(com.embeddablechatbot.android.push.MailPush.CHANNEL_MAIL, getString(R.string.notification_channel_mail), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = getString(R.string.notification_channel_mail_desc)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
             },
         )

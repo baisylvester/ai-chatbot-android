@@ -17,6 +17,8 @@ import com.embeddablechatbot.android.core.domain.model.MailActionStatus
 import com.embeddablechatbot.android.core.domain.model.MailConnection
 import com.embeddablechatbot.android.core.domain.model.MailMessageSummary
 import com.embeddablechatbot.android.core.domain.model.MailStatus
+import com.embeddablechatbot.android.core.domain.model.MailboxInfo
+import com.embeddablechatbot.android.core.domain.model.MailProviders
 import com.embeddablechatbot.android.core.domain.model.Message
 import com.embeddablechatbot.android.core.domain.model.MessagePage
 import com.embeddablechatbot.android.core.domain.model.OrgRole
@@ -126,9 +128,12 @@ fun MailStatusDto.toDomain() = MailStatus(
         else -> null
     },
     connection = connection?.let {
-        MailConnection(it.email, if (it.status == "active") ConnectionStatus.Active else ConnectionStatus.Revoked)
+        MailConnection(it.email, if (it.status == "active") ConnectionStatus.Active else ConnectionStatus.Revoked, it.id, it.provider)
     },
     pendingApprovals = pendingApprovals,
+    mailboxes = mailboxes.map { MailboxInfo(it.id, it.provider, it.email, if (it.status == "active") ConnectionStatus.Active else ConnectionStatus.Revoked, it.selected) },
+    providers = MailProviders(providers.gmail, providers.outlook, providers.imap, providers.calendar),
+    calendarEmail = calendar?.email,
 )
 
 fun ConnectLaunchDto.toDomain(): ConnectLaunch {

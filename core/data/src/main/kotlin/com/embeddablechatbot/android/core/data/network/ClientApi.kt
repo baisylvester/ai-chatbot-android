@@ -181,8 +181,25 @@ class ClientApi @Inject constructor(
 
     suspend fun mailStatus(chatbotId: String) = get("/mail/status", mapOf("chatbotId" to chatbotId), MailStatusDto.serializer())
 
-    suspend fun startConnect(chatbotId: String, challenge: String) =
-        send("POST", "/mail/connect", ApiJson.encodeToString(ConnectBody.serializer(), ConnectBody(chatbotId, challenge)), ConnectLaunchDto.serializer(), idempotent = false)
+    suspend fun startConnect(chatbotId: String, challenge: String, provider: String? = null) =
+        send("POST", "/mail/connect", ApiJson.encodeToString(ConnectBody.serializer(), ConnectBody(chatbotId, challenge, provider)), ConnectLaunchDto.serializer(), idempotent = false)
+
+    /** The server signs in to the mail server before saving, so this can take a while. */
+    suspend fun connectImap(body: ImapConnectBody) =
+        send("POST", "/mail/connect/imap", ApiJson.encodeToString(ImapConnectBody.serializer(), body), OkOrAnyDto.serializer(), idempotent = false, slow = true)
+
+    suspend fun selectMailbox(id: String) =
+        send("POST", "/mail/connection/select", ApiJson.encodeToString(SelectMailboxBody.serializer(), SelectMailboxBody(id)), OkDto.serializer(), idempotent = true)
+
+    suspend fun disconnectMailbox(id: String): Outcome<Authed<Unit>> = execute("DELETE", url("/mail/connection", mapOf("mailboxId" to id)), null, idempotent = true, client) { Unit }
+
+    suspend fun disconnectCalendar(): Outcome<Authed<Unit>> = execute("DELETE", url("/mail/calendar"), null, idempotent = true, client) { Unit }
+
+    suspend fun registerPush(token: String) =
+        send("POST", "/push/fcm", ApiJson.encodeToString(PushTokenBody.serializer(), PushTokenBody(token)), OkDto.serializer(), idempotent = true)
+
+    suspend fun unregisterPush(token: String): Outcome<Authed<Unit>> =
+        execute("DELETE", url("/push/fcm"), ApiJson.encodeToString(PushTokenBody.serializer(), PushTokenBody(token)), idempotent = true, client) { Unit }
 
     suspend fun completeConnect(transactionId: String, code: String, verifier: String) =
         send("POST", "/mail/connect/complete", ApiJson.encodeToString(CompleteConnectBody.serializer(), CompleteConnectBody(transactionId, code, verifier)), MailStatusDto.serializer(), idempotent = true)

@@ -121,7 +121,16 @@ data class StreamEventDto(
 // ---- Native mail API ----
 
 @Serializable
-data class MailConnectionDto(val email: String, val status: String)
+data class MailConnectionDto(val email: String, val status: String, val id: String? = null, val provider: String = "gmail")
+
+@Serializable
+data class MailboxDto(val id: String, val provider: String = "gmail", val email: String, val status: String, val selected: Boolean = false)
+
+@Serializable
+data class MailProvidersDto(val gmail: Boolean = true, val outlook: Boolean = false, val imap: Boolean = false, val calendar: Boolean = false)
+
+@Serializable
+data class CalendarDto(val email: String)
 
 @Serializable
 data class MailStatusDto(
@@ -131,10 +140,30 @@ data class MailStatusDto(
     val role: String? = null,
     val connection: MailConnectionDto? = null,
     val pendingApprovals: Int = 0,
+    val mailboxes: List<MailboxDto> = emptyList(),
+    val providers: MailProvidersDto = MailProvidersDto(),
+    val calendar: CalendarDto? = null,
+)
+
+/** `provider` is omitted for Gmail, so older servers keep accepting the request. */
+@Serializable
+data class ConnectBody(val chatbotId: String, val verifierChallenge: String, val provider: String? = null)
+
+@Serializable
+data class ImapConnectBody(
+    val chatbotId: String, val email: String, val password: String,
+    val imapHost: String? = null, val smtpHost: String? = null, val smtpPort: Int? = null, val username: String? = null,
 )
 
 @Serializable
-data class ConnectBody(val chatbotId: String, val verifierChallenge: String)
+data class SelectMailboxBody(val mailboxId: String)
+
+/** Any JSON object answer whose fields the app does not need. */
+@Serializable
+class OkOrAnyDto
+
+@Serializable
+data class PushTokenBody(val token: String, val platform: String = "android")
 
 @Serializable
 data class ConnectLaunchDto(val transactionId: String, val authorizationUrl: String, val expiresAt: String)

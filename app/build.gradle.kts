@@ -36,6 +36,11 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", quoted(config("chatbot.supabasePublishableKey")))
         buildConfigField("String", "DEFAULT_CHATBOT_ID", quoted(config("chatbot.chatbotId")))
         buildConfigField("String", "OAUTH_RETURN_URI", quoted("chatbotmail://oauth/gmail"))
+        // Firebase Cloud Messaging; push stays off while these are empty.
+        buildConfigField("String", "FIREBASE_APP_ID", quoted(config("firebase.appId")))
+        buildConfigField("String", "FIREBASE_API_KEY", quoted(config("firebase.apiKey")))
+        buildConfigField("String", "FIREBASE_PROJECT_ID", quoted(config("firebase.projectId")))
+        buildConfigField("String", "FIREBASE_SENDER_ID", quoted(config("firebase.senderId")))
         buildConfigField("boolean", "MIGRATE_LOCAL_PLATFORM", config("chatbot.migrateLocalPlatform", "false").toBoolean().toString())
     }
 
@@ -101,6 +106,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
+    implementation(libs.firebase.messaging)
     ksp(libs.androidx.hilt.compiler)
 
     testImplementation(libs.junit)

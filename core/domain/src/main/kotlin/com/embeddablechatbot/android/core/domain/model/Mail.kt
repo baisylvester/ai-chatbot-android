@@ -6,11 +6,27 @@ enum class OrgRole { Owner, Admin, Member }
 
 enum class ConnectionStatus { Active, Revoked }
 
-data class MailConnection(val email: String, val status: ConnectionStatus)
+data class MailConnection(val email: String, val status: ConnectionStatus, val id: String? = null, val provider: String = "gmail")
+
+/** One of the user's connected mailboxes. [selected] is the one the inbox and the assistant use. */
+data class MailboxInfo(val id: String, val provider: String, val email: String, val status: ConnectionStatus, val selected: Boolean) {
+    /** IMAP mailboxes have folders, not labels. */
+    val supportsLabels: Boolean get() = provider != "imap"
+    val providerName: String get() = when (provider) { "outlook" -> "Outlook"; "imap" -> "IMAP"; else -> "Gmail" }
+}
+
+/** Which kinds of account this server can connect. */
+data class MailProviders(val gmail: Boolean = true, val outlook: Boolean = false, val imap: Boolean = false, val calendar: Boolean = false)
+
+/** What a browser sign-in connects: a Gmail or Outlook mailbox, or Google Calendar. */
+enum class ConnectTarget(val wire: String) { Gmail("gmail"), Outlook("outlook"), Calendar("gcal") }
+
+/** Server names for an IMAP mailbox the server has no preset for. Null fields use the preset. */
+data class ImapServers(val imapHost: String? = null, val smtpHost: String? = null, val smtpPort: Int? = null, val username: String? = null)
 
 /**
  * The caller's mailbox capability for one chatbot. [eligible] means the user is an owner/admin of the
- * chatbot's organization, the existing server rule for mailbox tools.
+ * chatbot's organization, the existing server rule for mailbox tools. [connection] is the selected mailbox.
  */
 data class MailStatus(
     val provider: String,
@@ -19,8 +35,13 @@ data class MailStatus(
     val role: OrgRole?,
     val connection: MailConnection?,
     val pendingApprovals: Int,
+    val mailboxes: List<MailboxInfo> = emptyList(),
+    val providers: MailProviders = MailProviders(),
+    /** The connected Google Calendar's address, or null. */
+    val calendarEmail: String? = null,
 ) {
     val canUseMailTools: Boolean get() = serverReady && eligible && connection?.status == ConnectionStatus.Active
+    val selectedMailbox: MailboxInfo? get() = mailboxes.firstOrNull { it.selected }
 }
 
 data class ConnectLaunch(val transactionId: String, val authorizationUrl: String, val expiresAt: Instant)

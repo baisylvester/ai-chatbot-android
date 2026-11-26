@@ -6,4 +6,6 @@
     <string name="notification_approvals_title">Email actions need your review</string>
     <string name="notification_approvals_body">Open the app to review requests. Nothing is sent until you approve it there.</string>
     <string name="starting">Starting…</string>
+    <string name="notification_channel_mail">New mail</string>
+    <string name="notification_channel_mail_desc">A short summary when new mail arrives in your connected mailboxes.</string>
 </resources>

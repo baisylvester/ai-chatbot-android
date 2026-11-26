@@ -216,6 +216,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_OPEN = "open"
         const val OPEN_MAIL = "mail"
+        /** A new-mail notification: the app opens where it was, or on the inbox from a cold start. */
+        const val OPEN_INBOX = "inbox"
     }
 }
 

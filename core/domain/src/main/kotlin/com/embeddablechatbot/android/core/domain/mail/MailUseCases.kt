@@ -6,6 +6,7 @@ import com.embeddablechatbot.android.core.domain.model.ErrorReason
 import com.embeddablechatbot.android.core.domain.model.MailAction
 import com.embeddablechatbot.android.core.domain.model.MailActionDetail
 import com.embeddablechatbot.android.core.domain.model.MailStatus
+import com.embeddablechatbot.android.core.domain.model.ConnectTarget
 import com.embeddablechatbot.android.core.domain.model.Outcome
 import com.embeddablechatbot.android.core.domain.model.PendingConnect
 import com.embeddablechatbot.android.core.domain.repository.MailRepository
@@ -54,9 +55,11 @@ class ConnectMailboxUseCase @Inject constructor(
 ) {
     private val completing = Mutex()
 
-    suspend fun start(chatbotId: String, accountId: String): Outcome<String> {
+    suspend fun start(chatbotId: String, accountId: String, target: ConnectTarget = ConnectTarget.Gmail): Outcome<String> {
         val verifier = Pkce.newVerifier()
-        return when (val launch = repository.startConnect(chatbotId, Pkce.challenge(verifier))) {
+        val challenge = Pkce.challenge(verifier)
+        val launched = if (target == ConnectTarget.Gmail) repository.startConnect(chatbotId, challenge) else repository.startConnect(chatbotId, challenge, target)
+        return when (val launch = launched) {
             is Outcome.Ok -> {
                 store.save(PendingConnect(launch.value.transactionId, verifier, launch.value.expiresAt, accountId))
                 Outcome.Ok(launch.value.authorizationUrl)

@@ -13,6 +13,7 @@ import com.embeddablechatbot.android.core.data.db.ChatDao
 import com.embeddablechatbot.android.core.data.db.TransactionRunner
 import com.embeddablechatbot.android.core.data.network.ApiJson
 import com.embeddablechatbot.android.core.data.network.ClientApi
+import com.embeddablechatbot.android.core.data.network.ImapConnectBody
 import com.embeddablechatbot.android.core.data.network.toDomain
 import com.embeddablechatbot.android.core.domain.model.ActionFilter
 import com.embeddablechatbot.android.core.domain.model.ChatbotInfo
@@ -20,6 +21,8 @@ import com.embeddablechatbot.android.core.domain.model.ConnectLaunch
 import com.embeddablechatbot.android.core.domain.model.MailAction
 import com.embeddablechatbot.android.core.domain.model.MailActionDetail
 import com.embeddablechatbot.android.core.domain.model.MailStatus
+import com.embeddablechatbot.android.core.domain.model.ConnectTarget
+import com.embeddablechatbot.android.core.domain.model.ImapServers
 import com.embeddablechatbot.android.core.domain.model.Outcome
 import com.embeddablechatbot.android.core.domain.model.PendingConnect
 import com.embeddablechatbot.android.core.domain.model.PlatformConfig
@@ -160,6 +163,15 @@ class MailRepositoryImpl @Inject constructor(private val api: ClientApi) : MailR
     override suspend fun completeConnect(transactionId: String, code: String, verifier: String): Outcome<MailStatus> =
         api.completeConnect(transactionId, code, verifier).map { it.value.toDomain() }
     override suspend fun disconnect(): Outcome<Unit> = api.disconnectMail().map { }
+    override suspend fun startConnect(chatbotId: String, verifierChallenge: String, target: ConnectTarget): Outcome<ConnectLaunch> =
+        api.startConnect(chatbotId, verifierChallenge, target.wire.takeIf { target != ConnectTarget.Gmail }).map { it.value.toDomain() }
+    override suspend fun connectImap(chatbotId: String, email: String, appPassword: String, servers: ImapServers): Outcome<Unit> =
+        api.connectImap(ImapConnectBody(chatbotId, email.trim(), appPassword, servers.imapHost?.trim()?.ifBlank { null }, servers.smtpHost?.trim()?.ifBlank { null }, servers.smtpPort, servers.username?.trim()?.ifBlank { null })).map { }
+    override suspend fun selectMailbox(mailboxId: String): Outcome<Unit> = api.selectMailbox(mailboxId).map { }
+    override suspend fun disconnect(mailboxId: String): Outcome<Unit> = api.disconnectMailbox(mailboxId).map { }
+    override suspend fun disconnectCalendar(): Outcome<Unit> = api.disconnectCalendar().map { }
+    override suspend fun registerPush(token: String): Outcome<Unit> = api.registerPush(token).map { }
+    override suspend fun unregisterPush(token: String): Outcome<Unit> = api.unregisterPush(token).map { }
     override suspend fun actions(filter: ActionFilter): Outcome<List<MailAction>> =
         api.mailActions(filter.name.lowercase()).map { r -> r.value.actions.map { it.toDomain() } }
     override suspend fun actionDetail(id: String): Outcome<MailActionDetail> = api.mailAction(id).map { it.value.toDomain() }

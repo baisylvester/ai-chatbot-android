@@ -65,6 +65,7 @@ class InboxRepositoryImpl @Inject constructor(
     override suspend fun createLabel(name: String) = api.createMailLabel(name.trim()).map { it.value.toDomain() }
     override suspend fun updateLabel(id: String, name: String?, color: String?) = api.updateMailLabel(id, UpdateLabelBody(name?.trim(), color)).map { it.value.toDomain() }
     override suspend fun deleteLabel(id: String) = api.deleteMailLabel(id).map { }
+    override suspend fun clearOfflineCopy() { cache.clear() }
     override suspend fun pinned() = api.pinnedMail().map { r -> r.value.messages.map(InboxMessageDto::toDomain) }
     override suspend fun pin(id: String) = api.pinMail(id).map { }
     override suspend fun unpin(id: String) = api.unpinMail(id).map { }

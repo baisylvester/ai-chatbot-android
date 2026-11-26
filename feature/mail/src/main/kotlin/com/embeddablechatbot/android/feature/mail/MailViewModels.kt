@@ -15,6 +15,8 @@ import com.embeddablechatbot.android.core.domain.model.MailAction
 import com.embeddablechatbot.android.core.domain.model.MailActionDetail
 import com.embeddablechatbot.android.core.domain.model.MailActionStatus
 import com.embeddablechatbot.android.core.domain.model.MailStatus
+import com.embeddablechatbot.android.core.domain.model.ConnectTarget
+import com.embeddablechatbot.android.core.domain.model.ImapServers
 import com.embeddablechatbot.android.core.domain.model.Outcome
 import com.embeddablechatbot.android.core.domain.repository.AuthRepository
 import com.embeddablechatbot.android.core.domain.repository.ConfigRepository
@@ -50,7 +52,7 @@ class ConnectCallbackBus @Inject constructor() {
     fun take(): ConnectCallback? = latest.getAndUpdate { null }
 }
 
-enum class MailNotice { Connected, Disconnected, ConnectIgnored }
+enum class MailNotice { Connected, Disconnected, ConnectIgnored, Switched, CalendarDisconnected }
 
 data class MailUiState(
     val loading: Boolean = true,
@@ -105,12 +107,13 @@ class MailViewModel @Inject constructor(
         }
     }
 
-    fun startConnect() {
+    /** Opens the browser sign-in for a Gmail or Outlook mailbox, or for Google Calendar. */
+    fun startConnect(target: ConnectTarget = ConnectTarget.Gmail) {
         val account = accountId ?: return
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, error = null, declined = null, notice = null) }
         viewModelScope.launch {
-            when (val result = connect.start(config.config.value.chatbotId, account)) {
+            when (val result = connect.start(config.config.value.chatbotId, account, target)) {
                 is Outcome.Ok -> effects.send(MailEffect.OpenBrowser(result.value))
                 is Outcome.Err -> _state.update { it.copy(error = result.error) }
             }
@@ -129,6 +132,34 @@ class MailViewModel @Inject constructor(
         }
         _state.update { it.copy(busy = false) }
         refresh()
+    }
+
+    /** Connects an IMAP mailbox; the password is sent once to the server, which stores it encrypted. */
+    fun connectImap(email: String, appPassword: String, servers: ImapServers) {
+        if (_state.value.busy || email.isBlank() || appPassword.isBlank()) return
+        _state.update { it.copy(busy = true, error = null, declined = null, notice = null) }
+        viewModelScope.launch {
+            // A refresh after a failure would clear the error, so only success reloads the list.
+            when (val result = mail.connectImap(config.config.value.chatbotId, email, appPassword, servers)) {
+                is Outcome.Ok -> { _state.update { it.copy(notice = MailNotice.Connected, busy = false) }; refresh() }
+                is Outcome.Err -> _state.update { it.copy(error = result.error, busy = false) }
+            }
+        }
+    }
+
+    fun select(mailboxId: String) = run(MailNotice.Switched) { mail.selectMailbox(mailboxId) }
+    fun disconnectMailbox(mailboxId: String) = run(MailNotice.Disconnected) { mail.disconnect(mailboxId) }
+    fun disconnectCalendar() = run(MailNotice.CalendarDisconnected) { mail.disconnectCalendar() }
+
+    private fun run(notice: MailNotice, action: suspend () -> Outcome<Unit>) {
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, error = null, notice = null) }
+        viewModelScope.launch {
+            when (val result = action()) {
+                is Outcome.Ok -> { _state.update { it.copy(notice = notice, busy = false) }; refresh() }
+                is Outcome.Err -> _state.update { it.copy(error = result.error, busy = false) }
+            }
+        }
     }
 
     fun disconnect() {

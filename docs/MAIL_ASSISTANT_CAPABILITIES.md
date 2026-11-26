@@ -24,14 +24,18 @@ Updated 26 November 2026. The AI agent can read, organize, label and draft email
 - The approval workflow can send the reviewed draft now, or at a time you choose (from one minute to 60 days ahead). A scheduled email is sent by the server within about 10 minutes of that time, and only if the draft was not edited after you approved it. You can cancel a schedule or keep the email as a draft until it is sent. The AI cannot send or schedule independently.
 - Queue selected messages for review; move them to Trash.
 
+- Connect several mailboxes (up to 10): Gmail, Outlook / Microsoft 365 (when the server has a Microsoft app), and Yahoo, iCloud, AOL, Zoho, Fastmail, GMX or any IMAP provider with an app password. Switch between them in the drawer; the inbox and the assistant use the selected one, and each approval request is sent or trashed in the mailbox it was drafted in. IMAP mailboxes have folders but no labels; Outlook labels are categories, which cannot be renamed.
+- Optionally connect Google Calendar: the assistant can check when you are busy and hold time on your own calendar (no guests, nobody notified). Meeting invitations are still email drafts you approve.
+- New-mail push notifications to the phone once the server and the app build have a Firebase project; until then the in-app approval reminders keep working.
+
 ## It currently cannot
 
-- Connect Outlook, Yahoo, iCloud, or other IMAP providers.
-- Manage multiple mailboxes through a unified inbox.
+- Show one combined inbox of every mailbox at once (switch between them instead).
+- Invite people to calendar events directly (it drafts the invitation email instead).
 - Read archives, legacy Excel (.xls) or PowerPoint (.ppt) files; legacy Word (.doc) reading is best effort.
 - Attach files from the phone when the AI writes a draft in chat (it can attach files already in the mailbox; phone files go through the composer).
 - Run ongoing automatic replies, or continuously manage your inbox unattended.
-- Deliver native real-time new-email push notifications.
+- Deliver push notifications until a Firebase project is configured (see the gap table).
 - Control other Android apps, SMS, contacts, or calendars.
 - Act offline: the saved copy is read-only; AI processing and every Gmail action require internet access.
 - Large mailbox requests may need several rounds: the agent uses limited search results and processing steps.
@@ -40,6 +44,7 @@ Updated 26 November 2026. The AI agent can read, organize, label and draft email
 
 | Area | State |
 |---|---|
+| Several mailboxes, Outlook, IMAP, Calendar, FCM (26 November 2026; migrations `20261126120000_multi_mailbox.sql` and `20261126130000_calendar_push.sql`, Pages deployment `ca52f1cc`) | On the OPPO: the mailbox screen lists the Gmail mailbox as In use with Add Gmail / IMAP and Connect Google Calendar (Outlook hidden: no Microsoft app yet); an IMAP connect with a made-up Yahoo address reached Yahoo's IMAP server over TLS from Cloudflare and showed "The mail server refused the address or app password"; Connect Google Calendar opened Google's sign-in (closed without granting); the six live backend tests passed through the new mailbox code. Fixed during the run: a failed connect's error was cleared by the refresh that followed; the Worker went over Cloudflare's 25 MiB limit because two new routes pulled in their own copy of a 1.6 MB chunk. **Not yet run:** a real second mailbox, switching, Outlook (needs the Entra app), a real IMAP account, granting Calendar, push (needs Firebase) |
 | On the OPPO CPH2695 against the live service, 26 November 2026 (migration `20261126090000_mail_pins_preferences.sql` applied, Pages deployment `00879ea9`) | Passed: rename and recolor a Gmail label (then renamed back); pin an email, see it above the inbox after a refresh from the server, unpin it; recipient suggestions ("pipe" → both Pipedrive addresses) and choosing one; theme change stored on the server (then restored); with the app's network blocked, a cold start opens the saved inbox and a previously opened email. Fixed during the run: suggestions used Gmail word search, which missed partial names, so the phone now filters a list of recent correspondents; a cold start without a connection stopped at "Setting up your assistant" |
 | AI attaching mailbox files to a draft, reading .xlsx/.pptx/.doc on the phone, deleting a label | Unit-tested; **not yet run on the phone** |
 | Gmail status, Inbox reading, private-assistant setup, AI writing | Passed on the phone against the live service (20 November 2026) |
@@ -52,9 +57,8 @@ Updated 26 November 2026. The AI agent can read, organize, label and draft email
 
 | Item | What it needs |
 |---|---|
-| Outlook / Microsoft 365 | A Microsoft Entra app registration (client ID/secret, Mail.ReadWrite + Mail.Send consent) and a Graph-based `MailApi` implementation |
-| Yahoo / iCloud / IMAP | App-specific passwords per account and an IMAP/SMTP client over Cloudflare TCP sockets; handling those passwords needs a security review first |
-| Multiple mailboxes / unified inbox | Schema change (`mail_connections` is one row per user) and mailbox selection across every route and the agent |
-| Native push | A Firebase project (`google-services.json`), device-token storage and a server-side FCM sender; Gmail `watch` + Pub/Sub for true real-time |
+| Outlook / Microsoft 365 | Built; needs a Microsoft Entra app registration and `MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET` on the server (see DEPLOYMENT.md). The button appears once they are set |
+| Native push | Built; needs a Firebase project: `FCM_SERVICE_ACCOUNT_JSON` on the server and `firebase.*` values in the Android build. Checks still run every 10 minutes; true real-time needs Gmail `watch` + Pub/Sub |
+| Unified inbox | Mailboxes are switched, not merged; a merged view would need paging across providers |
 | Unattended auto-replies | Deliberately excluded: the AI never sends without the owner's explicit approval |
 | Legacy .xls / .ppt, archives | Binary formats need full parsers; the Worker is near Cloudflare's 25 MiB limit, so they would have to run on the phone |

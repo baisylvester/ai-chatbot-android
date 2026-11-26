@@ -53,6 +53,16 @@ import com.embeddablechatbot.android.core.designsystem.LoadingState
 import com.embeddablechatbot.android.core.designsystem.StatusBanner
 import com.embeddablechatbot.android.core.designsystem.message
 import com.embeddablechatbot.android.core.domain.model.ConnectionStatus
+import com.embeddablechatbot.android.core.domain.model.ConnectTarget
+import com.embeddablechatbot.android.core.domain.model.ImapServers
+import com.embeddablechatbot.android.core.domain.model.MailboxInfo
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.embeddablechatbot.android.core.domain.model.MailAction
 import com.embeddablechatbot.android.core.domain.model.MailActionKind
 import com.embeddablechatbot.android.core.domain.model.MailActionStatus
@@ -62,7 +72,8 @@ import com.embeddablechatbot.android.core.domain.model.MailActionStatus
 fun MailScreen(onBack: () -> Unit, onOpenAction: (String) -> Unit, viewModel: MailViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var confirmDisconnect by rememberSaveable { mutableStateOf(false) }
+    var confirmDisconnect by rememberSaveable { mutableStateOf<String?>(null) }
+    var imapForm by rememberSaveable { mutableStateOf(false) }
     LifecycleResumeEffect(viewModel) {
         viewModel.refresh()
         onPauseOrDispose { }
@@ -101,30 +112,40 @@ fun MailScreen(onBack: () -> Unit, onOpenAction: (String) -> Unit, viewModel: Ma
                 MailNotice.Connected -> StatusBanner(stringResource(R.string.mail_connected_notice), BannerTone.Info)
                 MailNotice.Disconnected -> StatusBanner(stringResource(R.string.mail_disconnected_notice), BannerTone.Info)
                 MailNotice.ConnectIgnored -> StatusBanner(stringResource(R.string.mail_ignored_notice), BannerTone.Warning)
+                MailNotice.Switched -> StatusBanner(stringResource(R.string.mail_switched_notice), BannerTone.Info)
+                MailNotice.CalendarDisconnected -> StatusBanner(stringResource(R.string.mail_calendar_disconnected), BannerTone.Info)
                 null -> Unit
             }
-            Text(stringResource(R.string.mail_connection), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+            Text(stringResource(R.string.mail_mailboxes), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             val status = state.status
-            val connection = status?.connection
             when {
                 status == null -> Unit
                 !status.serverReady -> StatusBanner(stringResource(R.string.mail_not_configured), BannerTone.Warning)
                 !status.eligible -> StatusBanner(stringResource(R.string.mail_role_required), BannerTone.Warning)
-                connection == null -> Text(stringResource(R.string.mail_not_connected))
-                connection.status == ConnectionStatus.Active -> Text(stringResource(R.string.mail_connected_as, connection.email))
-                else -> StatusBanner(stringResource(R.string.mail_revoked, connection.email), BannerTone.Warning)
+                status.mailboxes.isEmpty() && status.connection == null -> Text(stringResource(R.string.mail_not_connected))
+            }
+            status?.mailboxes?.forEach { box ->
+                MailboxRow(box, busy = state.busy, onSelect = { viewModel.select(box.id) }, onDisconnect = { confirmDisconnect = box.id },
+                    onReconnect = { when (box.provider) { "outlook" -> viewModel.startConnect(ConnectTarget.Outlook); "imap" -> imapForm = true; else -> viewModel.startConnect() } })
             }
             Text(stringResource(R.string.mail_explain), style = MaterialTheme.typography.bodySmall)
             if (status != null && status.serverReady && status.eligible) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Reauthorization preserves the current connection until the new browser flow succeeds.
-                    Button(onClick = viewModel::startConnect, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(if (connection == null) R.string.mail_connect else R.string.mail_reconnect))
-                    }
-                    if (connection != null) {
-                        OutlinedButton(onClick = { confirmDisconnect = true }, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp)) {
-                            Text(stringResource(R.string.mail_disconnect))
-                        }
+                Text(stringResource(R.string.mail_add), style = MaterialTheme.typography.titleSmall)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (status.providers.gmail) OutlinedButton(onClick = { viewModel.startConnect() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_connect)) }
+                    if (status.providers.outlook) OutlinedButton(onClick = { viewModel.startConnect(ConnectTarget.Outlook) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_connect_outlook)) }
+                    if (status.providers.imap) OutlinedButton(onClick = { imapForm = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_connect_imap)) }
+                }
+                if (status.providers.calendar || status.calendarEmail != null) {
+                    HorizontalDivider()
+                    Text(stringResource(R.string.mail_calendar), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                    Text(stringResource(R.string.mail_calendar_explain), style = MaterialTheme.typography.bodySmall)
+                    val calendar = status.calendarEmail
+                    if (calendar != null) {
+                        Text(stringResource(R.string.mail_calendar_connected, calendar))
+                        OutlinedButton(onClick = viewModel::disconnectCalendar, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_calendar_disconnect)) }
+                    } else {
+                        Button(onClick = { viewModel.startConnect(ConnectTarget.Calendar) }, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_calendar_connect)) }
                     }
                 }
             }
@@ -139,14 +160,78 @@ fun MailScreen(onBack: () -> Unit, onOpenAction: (String) -> Unit, viewModel: Ma
             }
         }
     }
-    if (confirmDisconnect) {
+    confirmDisconnect?.let { id ->
+        val email = state.status?.mailboxes?.firstOrNull { it.id == id }?.email.orEmpty()
         AlertDialog(
-            onDismissRequest = { confirmDisconnect = false },
-            text = { Text(stringResource(R.string.mail_disconnect_confirm)) },
-            confirmButton = { TextButton(onClick = { confirmDisconnect = false; viewModel.disconnect() }) { Text(stringResource(R.string.mail_disconnect)) } },
-            dismissButton = { TextButton(onClick = { confirmDisconnect = false }) { Text(stringResource(R.string.mail_cancel)) } },
+            onDismissRequest = { confirmDisconnect = null },
+            text = { Text(stringResource(R.string.mail_disconnect_one_confirm, email)) },
+            confirmButton = { TextButton(onClick = { confirmDisconnect = null; viewModel.disconnectMailbox(id) }) { Text(stringResource(R.string.mail_disconnect)) } },
+            dismissButton = { TextButton(onClick = { confirmDisconnect = null }) { Text(stringResource(R.string.mail_cancel)) } },
         )
     }
+    if (imapForm) ImapDialog(busy = state.busy, onDismiss = { imapForm = false }, onConnect = { email, password, servers -> imapForm = false; viewModel.connectImap(email, password, servers) })
+}
+
+@Composable
+private fun MailboxRow(box: MailboxInfo, busy: Boolean, onSelect: () -> Unit, onDisconnect: () -> Unit, onReconnect: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(box.email, fontWeight = FontWeight.SemiBold)
+            Text(
+                listOfNotNull(box.providerName, if (box.selected) stringResource(R.string.mail_in_use) else null).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (box.status != ConnectionStatus.Active) StatusBanner(stringResource(R.string.mail_revoked, box.email), BannerTone.Warning)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!box.selected && box.status == ConnectionStatus.Active) Button(onClick = onSelect, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_use_this)) }
+                if (box.status != ConnectionStatus.Active) Button(onClick = onReconnect, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_reconnect)) }
+                OutlinedButton(onClick = onDisconnect, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.mail_disconnect)) }
+            }
+        }
+    }
+}
+
+/**
+ * Email address and app password; server names only for providers without a preset. The password is
+ * never stored on the phone: it goes to the server once, which keeps it encrypted.
+ */
+@Composable
+private fun ImapDialog(busy: Boolean, onDismiss: () -> Unit, onConnect: (String, String, ImapServers) -> Unit) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    var imapHost by rememberSaveable { mutableStateOf("") }
+    var smtpHost by rememberSaveable { mutableStateOf("") }
+    var starttls by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.mail_connect_imap)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.mail_imap_explain), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(email, { email = it.trim().take(320) }, label = { Text(stringResource(R.string.mail_imap_email)) }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(password, { password = it.take(200) }, label = { Text(stringResource(R.string.mail_imap_password)) }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
+                TextButton(onClick = { advanced = !advanced }) { Text(stringResource(if (advanced) R.string.mail_imap_hide_servers else R.string.mail_imap_servers)) }
+                if (advanced) {
+                    OutlinedTextField(imapHost, { imapHost = it.trim().take(253) }, label = { Text(stringResource(R.string.mail_imap_host)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(smtpHost, { smtpHost = it.trim().take(253) }, label = { Text(stringResource(R.string.mail_smtp_host)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(starttls, { starttls = it })
+                        Text(stringResource(R.string.mail_smtp_587))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConnect(email, password, ImapServers(imapHost.ifBlank { null }, smtpHost.ifBlank { null }, if (advanced) (if (starttls) 587 else 465) else null)) },
+                enabled = !busy && email.contains('@') && password.length >= 4,
+            ) { Text(stringResource(R.string.mail_imap_connect)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.mail_cancel)) } },
+    )
 }
 
 @Composable

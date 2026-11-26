@@ -135,6 +135,24 @@ class MailHubViewModel @Inject constructor(
         val before = to.substringBeforeLast(',', "").trim()
         return (if (before.isEmpty()) "" else "$before, ") + contact.email + ", "
     }
+    /** Switches the inbox (and the assistant) to another connected mailbox and reloads everything. */
+    fun switchMailbox(mailboxId: String) {
+        val current = state.value.status?.selectedMailbox
+        if (current?.id == mailboxId || state.value.changing) return
+        mutable.update { it.copy(changing = true, error = null) }
+        viewModelScope.launch {
+            when (val result = mail.selectMailbox(mailboxId)) {
+                is Outcome.Ok -> {
+                    inbox.clearOfflineCopy()
+                    labelsLoaded = false; knownContacts = null
+                    mutable.update { it.copy(changing = false, labels = emptyList(), labelId = null, pinned = emptyList(), messages = emptyList(), loaded = false,
+                        folder = MailFolder.Inbox, selected = null, selectedId = null, query = "", notice = null, undo = null) }
+                    refresh()
+                }
+                is Outcome.Err -> mutable.update { it.copy(changing = false, error = result.error) }
+            }
+        }
+    }
     /** Renames and/or recolors a label; unchanged fields are not sent. */
     fun editLabel(label: MailLabel, name: String, color: String?) {
         val clean = name.trim().take(100)
