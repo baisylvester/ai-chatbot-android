@@ -7,6 +7,8 @@ import com.embeddablechatbot.android.core.domain.model.Outcome
 import com.embeddablechatbot.android.core.domain.testing.FakeConversationRepository
 import com.embeddablechatbot.android.core.domain.testing.SequentialIds
 import com.embeddablechatbot.android.core.domain.testing.conversation
+import com.embeddablechatbot.android.core.domain.testing.turn
+import com.embeddablechatbot.android.core.domain.model.TurnStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -46,8 +48,19 @@ class AssistantEntryViewModelTest {
         assertEquals(listOf("assistant-1"), repo.created)
     }
 
+    @Test fun `prompt reuses an unused conversation instead of adding an empty one`() = runTest {
+        repo.conversations.value = listOf(conversation("used", lastTurn = turn("r1", TurnStatus.Completed)), conversation("empty"))
+        val vm = vm(SavedStateHandle(mapOf("draft" to "Write a meeting invitation")))
+        vm.effect.test {
+            vm.open(); dispatcher.scheduler.runCurrent()
+            assertEquals("empty", awaitItem())
+        }
+        assertEquals(2, repo.conversations.value.size)
+        assertTrue(repo.submissions.isEmpty())
+    }
+
     @Test fun `prompt opens a fresh thread without submitting it or replacing history`() = runTest {
-        repo.conversations.value = listOf(conversation("existing"))
+        repo.conversations.value = listOf(conversation("existing", lastTurn = turn("r1", TurnStatus.Completed)))
         val vm = vm(SavedStateHandle(mapOf("draft" to "Write a meeting invitation")))
         vm.effect.test {
             vm.open(); dispatcher.scheduler.runCurrent()

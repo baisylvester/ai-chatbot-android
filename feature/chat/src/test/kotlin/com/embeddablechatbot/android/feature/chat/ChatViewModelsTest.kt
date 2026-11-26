@@ -87,6 +87,18 @@ class ConversationListViewModelTest {
     }
 
     @Test
+    fun `new chat reopens an unused conversation instead of creating another`() = runTest(StandardTestDispatcher(TestCoroutineScheduler()), timeout = 10.seconds) {
+        repo.conversations.value = listOf(conversation("used", lastTurn = turn("r1")), conversation("empty"))
+        val vm = viewModel(SavedStateHandle())
+        vm.effect.test {
+            vm.newConversation()
+            dispatcher.scheduler.runCurrent()
+            assertEquals(ListEffect.OpenConversation("empty"), awaitItem())
+        }
+        assertTrue(repo.created.isEmpty())
+    }
+
+    @Test
     fun `offline refresh marks the cached list as not current`() = runTest(StandardTestDispatcher(TestCoroutineScheduler()), timeout = 10.seconds) {
         repo.refreshResult = Outcome.Err(AppError.Network(uncertain = false))
         val vm = viewModel()

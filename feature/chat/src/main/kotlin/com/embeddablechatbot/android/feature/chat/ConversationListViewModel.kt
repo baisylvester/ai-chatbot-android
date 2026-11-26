@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -117,9 +118,18 @@ class ConversationListViewModel @Inject constructor(
      */
     fun newConversation() {
         if (local.value.creating) return
-        val id = saved.get<String>(NEW_ID) ?: ids.newId().also { saved[NEW_ID] = it }
+        val pending = saved.get<String>(NEW_ID)
         local.update { it.copy(creating = true, error = null) }
         viewModelScope.launch {
+            // An unused conversation is opened again rather than adding another empty one to history.
+            if (pending == null) {
+                repository.observeConversations().first().filter { it.lastTurn == null }.maxByOrNull { it.updatedAt }?.let { empty ->
+                    local.update { it.copy(creating = false) }
+                    effects.send(ListEffect.OpenConversation(empty.id))
+                    return@launch
+                }
+            }
+            val id = pending ?: ids.newId().also { saved[NEW_ID] = it }
             val result = repository.createConversation(id)
             when (result) {
                 is Outcome.Ok -> {

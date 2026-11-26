@@ -49,6 +49,14 @@ class AssistantEntryViewModel @Inject constructor(
                     return@launch
                 }
             }
+            // A prompt reuses an unused conversation instead of leaving another empty one in history.
+            if (hasPrompt && pendingId == null) {
+                conversations.refreshConversations()
+                conversations.observeConversations().first().filter { it.lastTurn == null }.maxByOrNull { it.updatedAt }?.let {
+                    opened.send(it.id)
+                    return@launch
+                }
+            }
             val id = pendingId ?: ids.newId().also { saved[PENDING_ID] = it }
             when (val result = conversations.createConversation(id)) {
                 is Outcome.Ok -> {

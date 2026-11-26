@@ -16,6 +16,8 @@
     <string name="hub_truncated">This message is long. The displayed text is truncated.</string><string name="hub_no_subject">(No subject)</string><string name="hub_to_line">To: %1$s</string><string name="hub_review">Review</string>
     <plurals name="hub_approval_count"><item quantity="one">%1$d action waiting for your approval</item><item quantity="other">%1$d actions waiting for your approval</item></plurals>
     <string name="hub_labels">Labels</string>
+    <string name="hub_folder_empty">Nothing in %1$s</string>
+    <string name="hub_folder_empty_body">Messages here will appear in this list. Refresh to check again.</string>
     <string name="hub_apply_labels">Apply</string>
     <string name="hub_new_label">New label</string>
     <string name="hub_label_name">Label name</string>

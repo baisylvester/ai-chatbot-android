@@ -76,6 +76,8 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
     if (newLabel) NewLabelDialog(onDismiss = { newLabel = false }, onCreate = { viewModel.createLabel(it); newLabel = false })
     val closeCompose = { if (!composer.saving) { if (composer.body.isNotBlank() && !composer.uncertain) discard = true else viewModel.closeComposer() } }
     BackHandler(enabled = composer.visible || state.selectedId != null) { if (composer.visible) closeCompose() else viewModel.closeMessage() }
+    // Back closes an open folder drawer before it leaves the screen.
+    BackHandler(enabled = drawer.isOpen && !composer.visible && state.selectedId == null) { scope.launch { drawer.close() } }
     if (discard) AlertDialog(onDismissRequest = { discard = false }, text = { Text(stringResource(R.string.hub_discard_title)) }, confirmButton = { TextButton(onClick = { discard = false; viewModel.closeComposer() }) { Text(stringResource(R.string.hub_discard)) } }, dismissButton = { TextButton(onClick = { discard = false }) { Text(stringResource(R.string.hub_keep_editing)) } })
     if (composer.visible) {
         Composer(composer, writer, viewModel, closeCompose)
@@ -94,7 +96,8 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
         return
     }
     ModalNavigationDrawer(drawerState = drawer, drawerContent = {
-        ModalDrawerSheet {
+        // Narrower than a phone screen so the scrim stays visible and tappable to close it.
+        ModalDrawerSheet(Modifier.widthIn(max = 296.dp).fillMaxWidth(0.82f)) {
             Text("Mail Assistant", Modifier.padding(24.dp), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
             state.status?.connection?.email?.let { Text(it, Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodyMedium) }
             Spacer(Modifier.height(20.dp))
@@ -155,7 +158,15 @@ private fun InboxBody(state: MailHubState, vm: MailHubViewModel, searchVisible: 
         } else if (state.status?.connection?.status != ConnectionStatus.Active || state.status?.eligible != true) {
             EmptyState(stringResource(R.string.hub_connect_title), stringResource(R.string.hub_connect_body), Modifier.weight(1f)) { Button(onClick = onConnection) { Text(stringResource(R.string.hub_connect)) } }
         } else {
-            if (state.messages.isEmpty() && state.loaded) EmptyState(stringResource(if (state.query.isBlank()) R.string.hub_no_mail else R.string.hub_no_results),stringResource(if (state.query.isBlank()) R.string.hub_no_mail_body else R.string.hub_no_results_body), Modifier.weight(1f))
+            if (state.messages.isEmpty() && state.loaded) {
+                // "All caught up" only fits the inbox views; other folders and labels say what is empty.
+                val place = state.labels.firstOrNull { it.id == state.labelId }?.name ?: state.folder.title.takeIf { state.folder !in listOf(MailFolder.Inbox, MailFolder.Unread) }
+                when {
+                    state.query.isNotBlank() -> EmptyState(stringResource(R.string.hub_no_results), stringResource(R.string.hub_no_results_body), Modifier.weight(1f))
+                    place != null -> EmptyState(stringResource(R.string.hub_folder_empty, place), stringResource(R.string.hub_folder_empty_body), Modifier.weight(1f))
+                    else -> EmptyState(stringResource(R.string.hub_no_mail), stringResource(R.string.hub_no_mail_body), Modifier.weight(1f))
+                }
+            }
             else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 100.dp)) {
                 items(state.messages,key = InboxMessage::id) { message ->
                     val swipe = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
@@ -210,7 +221,14 @@ private fun mailDate(raw: String): String = runCatching { ZonedDateTime.parse(ra
 @Composable
 private fun WritingBody(state: WriterState, vm: MailHubViewModel, modifier: Modifier, onContinue: (String) -> Unit) {
     val context = LocalContext.current
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    val scroll = rememberScrollState()
+    // A new result appears below the options: bring it into view so the user sees it arrived.
+    LaunchedEffect(state.result) {
+        if (state.result.isBlank()) return@LaunchedEffect
+        withFrameNanos { } // let the result card be measured so maxValue includes it
+        scroll.animateScrollTo(scroll.maxValue)
+    }
+    Column(modifier.fillMaxSize().verticalScroll(scroll).imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text("A little inspiration. A better email.",style = MaterialTheme.typography.headlineSmall,fontWeight = FontWeight.SemiBold)
         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement = Arrangement.spacedBy(8.dp)) { WritingTask.entries.forEach { task -> FilterChip(selected = state.task == task,onClick = { vm.writing(task = task) },label = { Text(task.title) },enabled = !state.busy,shape = CircleShape) } }
         Surface(shape = RoundedCornerShape(22.dp),color = MaterialTheme.colorScheme.surfaceContainerLow) {
