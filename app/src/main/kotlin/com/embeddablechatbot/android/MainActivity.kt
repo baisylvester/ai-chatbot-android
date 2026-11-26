@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -290,6 +291,8 @@ private fun SignedInGraph(viewModel: MainViewModel) {
             )
         }
         composable<ConversationsRoute> {
+            // History can be the bottom of the stack; Back then goes to the inbox instead of leaving the app.
+            BackHandler(enabled = nav.previousBackStackEntry == null) { nav.popBack() }
             ConversationListScreen(
                 onOpen = { nav.navigate(ChatRoute(it)) },
                 onBack = { nav.popBack() },
@@ -303,7 +306,7 @@ private fun SignedInGraph(viewModel: MainViewModel) {
             ChatScreen(
                 onBack = { nav.popBack() },
                 onMailbox = { nav.navigate(MailRoute) { launchSingleTop = true } },
-                onHistory = { nav.navigate(ConversationsRoute) { launchSingleTop = true } },
+                onHistory = { nav.openHistory() },
                 onWritingTools = { nav.navigate(WritingToolsRoute) { launchSingleTop = true } },
                 assistantInput = incoming,
                 assistantInputId = incomingId,
@@ -326,8 +329,17 @@ private fun SignedInGraph(viewModel: MainViewModel) {
     }
 }
 
+/** Goes to the previous screen, or to the inbox (the app's home) when nothing is behind this one. */
 private fun NavHostController.popBack() {
-    if (!popBackStack()) navigate(ConversationsRoute) { popUpTo(0) }
+    if (!popBackStack()) navigate(MailHomeRoute) { popUpTo(0) }
+}
+
+/**
+ * Returns to History already on the back stack instead of stacking another copy, so Back from
+ * History never cycles History → chat → History.
+ */
+private fun NavHostController.openHistory() {
+    if (!popBackStack<ConversationsRoute>(inclusive = false)) navigate(ConversationsRoute) { launchSingleTop = true }
 }
 
 @Composable
