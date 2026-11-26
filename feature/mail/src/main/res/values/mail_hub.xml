@@ -37,4 +37,18 @@
     <string name="hub_attach_total">Attachments: %1$s of 10 MB</string>
     <string name="hub_attach_failed">Could not attach %1$s. Files can total at most 10 MB.</string>
     <string name="hub_remove_attachment">Remove %1$s</string>
+    <string name="hub_edit_label">Edit label</string>
+    <string name="hub_label_color">Color</string>
+    <string name="hub_label_color_n">Color %1$d</string>
+    <string name="hub_save">Save</string>
+    <string name="hub_delete_label">Delete label</string>
+    <string name="hub_delete_label_confirm">Delete the label "%1$s"? Its emails stay in your mailbox; only the label is removed. This cannot be undone.</string>
+    <string name="hub_delete">Delete</string>
+    <string name="hub_label_actions">Edit %1$s</string>
+    <string name="hub_pin_mail">Pin</string>
+    <string name="hub_unpin_mail">Unpin</string>
+    <string name="hub_pinned_mail">Pinned</string>
+    <string name="hub_everything_else">Everything else</string>
+    <string name="hub_offline_copy">You are offline. Showing mail saved on this phone (%1$s). Actions need a connection.</string>
+    <string name="hub_offline_message">Offline copy saved on this phone. Actions need a connection.</string>
 </resources>

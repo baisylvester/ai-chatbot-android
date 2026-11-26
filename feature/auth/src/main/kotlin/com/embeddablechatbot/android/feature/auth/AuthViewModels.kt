@@ -142,6 +142,7 @@ class SettingsViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val config: ConfigRepository,
     private val preferences: PreferencesRepository,
+    private val themeSync: com.embeddablechatbot.android.core.domain.repository.ThemeSync = com.embeddablechatbot.android.core.domain.repository.ThemeSync.None,
 ) : ViewModel() {
     val state: StateFlow<SettingsUiState> = combine(auth.authState, config.config, preferences.preferences) { a, c, p ->
         val account = (a as? AuthState.SignedIn)?.account
@@ -156,7 +157,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             // Read the account now, not from the UI state, so a change never lands on another account.
             val user = (auth.authState.value as? AuthState.SignedIn)?.account?.userId ?: return@launch
-            preferences.update { p -> p.copy(accountThemes = p.accountThemes + (user to change(p.themeFor(user)))) }
+            var chosen: com.embeddablechatbot.android.core.domain.model.ThemeChoice? = null
+            preferences.update { p -> val next = change(p.themeFor(user)); chosen = next; p.copy(accountThemes = p.accountThemes + (user to next)) }
+            // The local choice applies at once; syncing is best effort and only for the same account.
+            chosen?.let { if ((auth.authState.value as? AuthState.SignedIn)?.account?.userId == user) themeSync.push(it) }
         }
     }
 

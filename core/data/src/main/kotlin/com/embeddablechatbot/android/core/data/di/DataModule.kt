@@ -47,6 +47,7 @@ import okhttp3.OkHttpClient
 @InstallIn(SingletonComponent::class)
 abstract class DataBindings {
     @Binds abstract fun config(impl: ConfigRepositoryImpl): ConfigRepository
+    @Binds abstract fun themeSync(impl: com.embeddablechatbot.android.core.data.repository.ThemeSyncImpl): com.embeddablechatbot.android.core.domain.repository.ThemeSync
     @Binds abstract fun auth(impl: SessionManager): AuthRepository
     @Binds abstract fun registration(impl: SessionManager): com.embeddablechatbot.android.core.domain.repository.RegistrationRepository
     @Binds abstract fun registrationApi(impl: SupabaseAuthApi): com.embeddablechatbot.android.core.data.auth.RegistrationApi

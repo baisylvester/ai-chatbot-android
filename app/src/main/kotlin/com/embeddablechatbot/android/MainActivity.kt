@@ -64,6 +64,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -106,7 +108,25 @@ class MainViewModel @Inject constructor(
     private val bus: ConnectCallbackBus,
     private val conversations: ConversationRepository,
     private val ids: IdGenerator,
+    private val themeSync: com.embeddablechatbot.android.core.domain.repository.ThemeSync,
 ) : ViewModel() {
+    init {
+        // Each sign-in takes the account's theme from the server; an account with none saved uploads this phone's.
+        viewModelScope.launch {
+            auth.authState.map { (it as? AuthState.SignedIn)?.account?.userId }.distinctUntilChanged().collect { user ->
+                if (user == null) return@collect
+                when (val remote = themeSync.pull()) {
+                    is Outcome.Ok -> {
+                        if ((auth.authState.value as? AuthState.SignedIn)?.account?.userId != user) return@collect
+                        val saved = remote.value
+                        if (saved != null) preferences.update { p -> p.copy(accountThemes = p.accountThemes + (user to saved)) }
+                        else preferences.preferences.first().accountThemes[user]?.let { themeSync.push(it) }
+                    }
+                    is Outcome.Err -> Unit
+                }
+            }
+        }
+    }
     val root: StateFlow<RootState> = combine(auth.authState, config.config) { a, c ->
         when {
             a == AuthState.Restoring -> RootState.Starting

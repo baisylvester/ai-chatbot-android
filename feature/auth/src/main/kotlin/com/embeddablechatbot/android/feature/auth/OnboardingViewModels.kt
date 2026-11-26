@@ -72,10 +72,18 @@ class OnboardingViewModel @Inject constructor(private val onboarding:OnboardingR
         if(state.value.ready)return
         mutable.value=BootstrapUiState()
         viewModelScope.launch {
+            // Offline, an account already set up on this phone opens the app (and its saved mail) anyway.
+            suspend fun offlineReady(error:AppError):Boolean {
+                if(error !is AppError.Network)return false
+                val user=(auth.authState.value as? AuthState.SignedIn)?.account?.userId ?: return false
+                if(user !in preferences.preferences.first().onboardedAccounts)return false
+                mutable.value=BootstrapUiState(busy=false,ready=true,connected=false,previouslyOnboarded=true)
+                return true
+            }
             when(val prepared=onboarding.prepare()) {
-                is Outcome.Err -> mutable.value=BootstrapUiState(busy=false,error=prepared.error)
+                is Outcome.Err -> if(!offlineReady(prepared.error))mutable.value=BootstrapUiState(busy=false,error=prepared.error)
                 is Outcome.Ok -> when(val status=mail.status(config.config.value.chatbotId)) {
-                    is Outcome.Err -> mutable.value=BootstrapUiState(busy=false,error=status.error)
+                    is Outcome.Err -> if(!offlineReady(status.error))mutable.value=BootstrapUiState(busy=false,error=status.error)
                     is Outcome.Ok -> {
                         val user=(auth.authState.value as? AuthState.SignedIn)?.account?.userId ?: return@launch
                         val completed=user in preferences.preferences.first().onboardedAccounts

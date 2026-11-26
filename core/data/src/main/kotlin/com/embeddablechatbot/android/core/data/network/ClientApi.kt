@@ -148,6 +148,9 @@ class ClientApi @Inject constructor(
     private fun validateTurn(turn: Turn, requestId: String): AppError? =
         if (turn.requestId != requestId || turn.status == TurnStatus.Running) AppError.Protocol("Invalid completion. Refresh the conversation.") else null
 
+    suspend fun preferences() = get("/preferences", emptyMap(), PreferencesDto.serializer())
+    suspend fun savePreferences(body: PreferencesDto) = send("PUT", "/preferences", ApiJson.encodeToString(PreferencesDto.serializer(), body), OkDto.serializer(), idempotent = true)
+
     // ---- Native mail API ----
 
     suspend fun inbox(folder: String, query: String, cursor: String?, labelId: String? = null) = get("/mail/messages", buildMap {
@@ -155,6 +158,13 @@ class ClientApi @Inject constructor(
     }, InboxPageDto.serializer())
     suspend fun mailLabels() = get("/mail/labels", mapOf("chatbotId" to config.config.value.chatbotId), MailLabelListDto.serializer())
     suspend fun createMailLabel(name: String) = send("POST", mailboxPath("labels"), ApiJson.encodeToString(CreateLabelBody.serializer(), CreateLabelBody(name)), MailLabelDto.serializer(), idempotent = false)
+    suspend fun updateMailLabel(id: String, body: UpdateLabelBody) = send("PATCH", mailboxPath("labels/${seg(id)}"), ApiJson.encodeToString(UpdateLabelBody.serializer(), body), MailLabelDto.serializer(), idempotent = true)
+    suspend fun deleteMailLabel(id: String): Outcome<Authed<Unit>> = execute("DELETE", url(mailboxPath("labels/${seg(id)}")), null, idempotent = true, client) { Unit }
+    suspend fun pinnedMail() = get("/mail/pins", mapOf("chatbotId" to config.config.value.chatbotId), PinnedListDto.serializer())
+    /** Pinning or unpinning twice has the same result, so a retry is safe. */
+    suspend fun pinMail(id: String) = send("POST", mailboxPath("pins"), ApiJson.encodeToString(PinBody.serializer(), PinBody(id)), OkDto.serializer(), idempotent = true)
+    suspend fun unpinMail(id: String): Outcome<Authed<Unit>> = execute("DELETE", url(mailboxPath("pins/${seg(id)}")), null, idempotent = true, client) { Unit }
+    suspend fun mailContacts() = get("/mail/contacts", mapOf("chatbotId" to config.config.value.chatbotId), MailContactListDto.serializer())
     /** Setting the same labels twice has the same result, so a retry is safe. */
     suspend fun relabel(body: RelabelBody) = send("POST", mailboxPath("labels/apply"), ApiJson.encodeToString(RelabelBody.serializer(), body), OkDto.serializer(), idempotent = true)
     suspend fun attachmentBytes(messageId: String, partId: String): Outcome<Authed<Pair<String, ByteArray>>> =

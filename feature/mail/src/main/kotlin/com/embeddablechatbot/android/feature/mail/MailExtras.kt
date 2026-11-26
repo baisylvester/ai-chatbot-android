@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
@@ -34,7 +35,12 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
 import com.embeddablechatbot.android.core.domain.mail.DownloadedFile
+import com.embeddablechatbot.android.core.domain.mail.LabelColors
 import com.embeddablechatbot.android.core.domain.mail.MailLabel
 import com.embeddablechatbot.android.core.domain.mail.MessageAttachment
 import com.embeddablechatbot.android.core.domain.mail.OutgoingAttachment
@@ -101,6 +107,51 @@ fun NewLabelDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
         title = { Text(stringResource(R.string.hub_new_label)) },
         text = { OutlinedTextField(name, { name = it.take(100) }, label = { Text(stringResource(R.string.hub_label_name)) }, singleLine = true) },
         confirmButton = { TextButton(onClick = { onCreate(name) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.hub_create)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.hub_cancel)) } },
+    )
+}
+
+/** Rename, recolor (Gmail's palette only) or delete a label. Delete asks again before acting. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun EditLabelDialog(label: MailLabel, onDismiss: () -> Unit, onSave: (String, String?) -> Unit, onDelete: () -> Unit) {
+    var name by rememberSaveable(label.id) { mutableStateOf(label.name) }
+    var color by rememberSaveable(label.id) { mutableStateOf(label.color?.lowercase()) }
+    var confirmDelete by rememberSaveable(label.id) { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.hub_delete_label)) },
+            text = { Text(stringResource(R.string.hub_delete_label_confirm, label.name)) },
+            confirmButton = { TextButton(onClick = onDelete) { Text(stringResource(R.string.hub_delete), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.hub_cancel)) } },
+        )
+        return
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.hub_edit_label)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(name, { name = it.take(100) }, label = { Text(stringResource(R.string.hub_label_name)) }, singleLine = true)
+                Text(stringResource(R.string.hub_label_color), style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LabelColors.forEachIndexed { index, hex ->
+                        val chosen = color == hex
+                        val description = stringResource(R.string.hub_label_color_n, index + 1)
+                        Box(
+                            Modifier.size(36.dp).background(Color(android.graphics.Color.parseColor(hex)), CircleShape)
+                                .then(if (chosen) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                                .clickable { color = hex }
+                                .semantics { contentDescription = description; selected = chosen },
+                            contentAlignment = Alignment.Center,
+                        ) { if (chosen) Icon(Icons.Default.Check, null, tint = Color.White) }
+                    }
+                }
+                TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.hub_delete_label), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(name, color) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.hub_save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.hub_cancel)) } },
     )
 }

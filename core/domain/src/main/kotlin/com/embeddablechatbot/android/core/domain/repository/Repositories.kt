@@ -42,6 +42,18 @@ interface PreferencesRepository {
     suspend fun update(transform: (UserPreferences) -> UserPreferences)
 }
 
+/** Keeps the signed-in user's color theme the same on every device they use. */
+interface ThemeSync {
+    /** The theme saved on the server, or null when none was saved yet. */
+    suspend fun pull(): Outcome<com.embeddablechatbot.android.core.domain.model.ThemeChoice?>
+    suspend fun push(choice: com.embeddablechatbot.android.core.domain.model.ThemeChoice): Outcome<Unit>
+    /** For tests and previews: nothing is synced. */
+    object None : ThemeSync {
+        override suspend fun pull(): Outcome<com.embeddablechatbot.android.core.domain.model.ThemeChoice?> = Outcome.Ok(null)
+        override suspend fun push(choice: com.embeddablechatbot.android.core.domain.model.ThemeChoice): Outcome<Unit> = Outcome.Ok(Unit)
+    }
+}
+
 interface ChatbotRepository {
     suspend fun chatbot(chatbotId: String): Outcome<ChatbotInfo>
 }

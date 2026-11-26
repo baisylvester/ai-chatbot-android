@@ -119,6 +119,56 @@ class MailHubViewModelTest {
         assertEquals(Triple(listOf("one"),listOf("Label_2"),listOf("Label_1")),inbox.relabels.single())
         assertEquals(listOf("Label_2"),vm.state.value.messages.single().labelIds)
     }
+    @Test fun `renaming or recoloring a label sends only what changed`() = runTest(dispatcher) {
+        val vm=vm(); runCurrent()
+        val clients=vm.state.value.labels.first()
+        vm.editLabel(clients,"Clients",null); runCurrent()
+        assertTrue(inbox.labelEdits.isEmpty())
+        vm.editLabel(clients,"Customers","#16a766"); runCurrent()
+        assertEquals(Triple("Label_1","Customers","#16a766"),inbox.labelEdits.single())
+        assertEquals(listOf("Customers","Travel"),vm.state.value.labels.map{it.name})
+    }
+    @Test fun `deleting the open label returns to the inbox and keeps its messages`() = runTest(dispatcher) {
+        val msg=message("one").copy(labelIds=listOf("Label_1"))
+        inbox.pages += Outcome.Ok(InboxPage(listOf(msg),null))
+        val vm=vm(); runCurrent()
+        vm.selectLabel(MailLabel("Label_1","Clients")); runCurrent()
+        vm.deleteLabel(MailLabel("Label_1","Clients")); runCurrent()
+        assertEquals(listOf("Label_1"),inbox.labelDeletes)
+        assertEquals(listOf("Travel"),vm.state.value.labels.map{it.name})
+        assertNull(vm.state.value.labelId); assertEquals(MailFolder.Inbox,vm.state.value.folder)
+    }
+    @Test fun `offline shows the saved copy instead of an error`() = runTest(dispatcher) {
+        mail.statusResult = Outcome.Err(AppError.Network(false))
+        inbox.pages += Outcome.Ok(InboxPage(listOf(message("saved")),null,savedAt = 1_000L))
+        val vm=vm(); runCurrent()
+        assertNull(vm.state.value.error); assertEquals(1_000L,vm.state.value.savedAt)
+        assertEquals(listOf("saved"),vm.state.value.messages.map{it.id})
+    }
+    @Test fun `offline with nothing saved reports the connection problem`() = runTest(dispatcher) {
+        mail.statusResult = Outcome.Err(AppError.Network(false))
+        val vm=vm(); runCurrent()
+        assertTrue(vm.state.value.error is AppError.Network); assertNull(vm.state.value.savedAt)
+    }
+    @Test fun `pinning shows the message above the inbox and unpinning removes it`() = runTest(dispatcher) {
+        val msg=message("one")
+        inbox.pages += Outcome.Ok(InboxPage(listOf(msg),null))
+        val vm=vm(); runCurrent()
+        vm.togglePin(msg); runCurrent()
+        assertTrue(vm.state.value.isPinned("one")); assertTrue(vm.state.value.showsPinned)
+        vm.togglePin(msg); runCurrent()
+        assertEquals(listOf("+one","-one"),inbox.pins); assertFalse(vm.state.value.showsPinned)
+    }
+    @Test fun `contact suggestions complete only the recipient being typed`() = runTest(dispatcher) {
+        val vm=vm(); runCurrent()
+        vm.suggestContacts("pipe"); runCurrent()
+        assertEquals("hello@pipedrive.test",vm.contactSuggestions.value.single().email)
+        vm.suggestContacts("bob@example.test, an"); runCurrent()
+        val ana=vm.contactSuggestions.value.single()
+        assertEquals(1,inbox.contactLoads)
+        assertEquals("bob@example.test, ana@example.test, ",vm.chooseContact("bob@example.test, an",ana))
+        assertTrue(vm.contactSuggestions.value.isEmpty())
+    }
     @Test fun `attachments are limited to ten megabytes and ten files`() = runTest(dispatcher) {
         val vm=vm(); runCurrent(); vm.compose("ana@example.test","Files","See attached")
         vm.addAttachment("big.bin","application/octet-stream",ByteArray(6*1024*1024))
@@ -168,6 +218,15 @@ class MailHubViewModelTest {
         var textResult: Outcome<AttachmentText> = Outcome.Ok(AttachmentText("terms.pdf","Contract terms",false))
         override suspend fun labels()=labelsResult
         override suspend fun createLabel(name:String):Outcome<MailLabel> = Outcome.Ok(MailLabel("Label_9",name))
+        val labelEdits=mutableListOf<Triple<String,String?,String?>>(); val labelDeletes=mutableListOf<String>()
+        override suspend fun updateLabel(id:String,name:String?,color:String?):Outcome<MailLabel> {labelEdits+=Triple(id,name,color); return Outcome.Ok(MailLabel(id,name?:"Clients",color))}
+        override suspend fun deleteLabel(id:String):Outcome<Unit> {labelDeletes+=id; return Outcome.Ok(Unit)}
+        val pins=mutableListOf<String>()
+        override suspend fun pinned():Outcome<List<InboxMessage>> = Outcome.Ok(emptyList())
+        override suspend fun pin(id:String):Outcome<Unit> {pins+="+$id"; return Outcome.Ok(Unit)}
+        override suspend fun unpin(id:String):Outcome<Unit> {pins+="-$id"; return Outcome.Ok(Unit)}
+        var contactLoads=0
+        override suspend fun contacts():Outcome<List<MailContact>> {contactLoads++; return Outcome.Ok(listOf(MailContact("Ana","ana@example.test"),MailContact("Pipedrive","hello@pipedrive.test")))}
         override suspend fun relabel(ids:List<String>,add:List<String>,remove:List<String>):Outcome<Unit> {relabels+=Triple(ids,add,remove); return Outcome.Ok(Unit)}
         override suspend fun attachment(messageId:String,partId:String):Outcome<DownloadedFile> = Outcome.Ok(DownloadedFile(partId,"application/pdf",byteArrayOf(1,2)))
         override suspend fun attachmentText(messageId:String,partId:String)=textResult

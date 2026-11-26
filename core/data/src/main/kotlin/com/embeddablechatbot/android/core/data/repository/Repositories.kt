@@ -195,8 +195,12 @@ class PendingConnectStoreImpl @Inject constructor(private val secrets: SecretSto
 }
 
 @Singleton
-class AccountDataCleanerImpl @Inject constructor(private val dao: ChatDao, private val transaction: TransactionRunner) : AccountDataCleaner {
-    override suspend fun clearAccountData() = transaction {
+class AccountDataCleanerImpl @Inject constructor(private val dao: ChatDao, private val transaction: TransactionRunner, private val mailCache: MailCache) : AccountDataCleaner {
+    override suspend fun clearAccountData() {
+        mailCache.clear()
+        clearChat()
+    }
+    private suspend fun clearChat() = transaction {
         dao.clearPending()
         dao.clearUnconfirmed()
         dao.clearMessages()

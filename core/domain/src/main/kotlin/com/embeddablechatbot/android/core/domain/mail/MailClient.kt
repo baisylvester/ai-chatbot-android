@@ -13,15 +13,22 @@ data class InboxMessage(
     val date: String, val snippet: String, val unread: Boolean, val starred: Boolean,
     val labelIds: List<String> = emptyList(),
 )
-data class InboxPage(val messages: List<InboxMessage>, val nextCursor: String?)
+/** [savedAt] is set when the page is the offline copy saved on the phone (epoch millis). */
+data class InboxPage(val messages: List<InboxMessage>, val nextCursor: String?, val savedAt: Long? = null)
 /** A file attached to a received message; [partId] addresses it within that message. */
 data class MessageAttachment(val partId: String, val filename: String, val mimeType: String, val size: Long) {
     /** Formats the server can read for summaries: documents as text, images through the AI model. */
-    val readable: Boolean get() = filename.substringAfterLast('.', "").lowercase() in setOf("pdf", "docx", "txt", "text", "md", "markdown", "csv", "html", "htm", "png", "jpg", "jpeg", "webp", "heic", "heif") ||
-        mimeType in setOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "text/markdown", "text/csv", "text/html", "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif")
+    val readable: Boolean get() = filename.substringAfterLast('.', "").lowercase() in setOf("pdf", "docx", "doc", "xlsx", "pptx", "txt", "text", "md", "markdown", "csv", "tsv", "html", "htm", "png", "jpg", "jpeg", "webp", "heic", "heif") ||
+        mimeType in setOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "text/tab-separated-values", "text/plain", "text/markdown", "text/csv", "text/html", "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif")
 }
-data class OpenMessage(val summary: InboxMessage, val to: String, val body: String, val truncated: Boolean, val attachments: List<MessageAttachment> = emptyList())
+data class OpenMessage(val summary: InboxMessage, val to: String, val body: String, val truncated: Boolean, val attachments: List<MessageAttachment> = emptyList(), val offline: Boolean = false)
 data class MailLabel(val id: String, val name: String, val color: String? = null)
+/** Someone the user has exchanged mail with, suggested while typing a recipient. */
+data class MailContact(val name: String, val email: String)
+
+/** Background colors Gmail accepts for labels (the server refuses any other). */
+val LabelColors = listOf("#fb4c2f", "#ffad47", "#fad165", "#16a766", "#43d692", "#4a86e8", "#2da2bb", "#a479e2", "#f691b3", "#666666")
 data class DownloadedFile(val filename: String, val mimeType: String, val bytes: ByteArray) {
     override fun equals(other: Any?) = other is DownloadedFile && filename == other.filename && mimeType == other.mimeType && bytes.contentEquals(other.bytes)
     override fun hashCode() = 31 * filename.hashCode() + bytes.contentHashCode()
@@ -55,6 +62,10 @@ interface InboxRepository {
     suspend fun list(folder: MailFolder, query: String, cursor: String? = null, labelId: String? = null): Outcome<InboxPage>
     suspend fun labels(): Outcome<List<MailLabel>>
     suspend fun createLabel(name: String): Outcome<MailLabel>
+    /** Renames and/or recolors one of the user's labels; [color] must be one of [LabelColors]. */
+    suspend fun updateLabel(id: String, name: String?, color: String?): Outcome<MailLabel>
+    /** Deletes the label only; messages that carried it are kept. */
+    suspend fun deleteLabel(id: String): Outcome<Unit>
     /** Adds and removes the user's own labels. Reversible, so it applies immediately. */
     suspend fun relabel(ids: List<String>, add: List<String>, remove: List<String>): Outcome<Unit>
     suspend fun attachment(messageId: String, partId: String): Outcome<DownloadedFile>
@@ -63,6 +74,12 @@ interface InboxRepository {
     suspend fun change(id: String, change: MailChange, requestId: String): Outcome<MailChangeReceipt>
     suspend fun saveDraft(draft: ComposeDraft): Outcome<DraftReceipt>
     suspend fun write(request: WritingRequest): Outcome<String>
+    /** Pinned messages (kept by the app, synced across the user's devices), newest pin first. */
+    suspend fun pinned(): Outcome<List<InboxMessage>> = Outcome.Ok(emptyList())
+    suspend fun pin(id: String): Outcome<Unit> = Outcome.Ok(Unit)
+    suspend fun unpin(id: String): Outcome<Unit> = Outcome.Ok(Unit)
+    /** People from the user's recent mail, most frequent first; the app filters them while typing. */
+    suspend fun contacts(): Outcome<List<MailContact>> = Outcome.Ok(emptyList())
 }
 
 data class MailPrompt(val id: String, val title: String, val description: String, val category: String, val text: String)

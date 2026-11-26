@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 enum class HubTab { Mail, Writing, Prompts }
@@ -24,7 +25,15 @@ data class MailHubState(
     val labels: List<MailLabel> = emptyList(), val labelId: String? = null,
     /** The attachment being downloaded or read, by part id. */
     val attachmentBusy: String? = null,
-)
+    /** Pinned messages, shown above the inbox. */
+    val pinned: List<InboxMessage> = emptyList(),
+    /** Set while the list is the offline copy saved on the phone (when it was saved, epoch millis). */
+    val savedAt: Long? = null,
+) {
+    /** Pins appear only on the plain inbox view, not in other folders, labels or searches. */
+    val showsPinned: Boolean get() = folder == MailFolder.Inbox && labelId == null && query.isBlank() && pinned.isNotEmpty()
+    fun isPinned(id: String) = pinned.any { it.id == id }
+}
 data class WriterState(val task: WritingTask = WritingTask.Write, val text: String = "", val tone: String = "Professional", val length: String = "Medium", val language: String = "English", val result: String = "", val busy: Boolean = false, val error: AppError? = null)
 /** [attachments] live in memory only: after process death the user re-adds them. */
 data class ComposerState(
@@ -85,6 +94,79 @@ class MailHubViewModel @Inject constructor(
             }
         }
     }
+    private fun loadPinned() {
+        viewModelScope.launch {
+            // Pins are an extra: a failure keeps the previous list and the mailbox stays usable.
+            (inbox.pinned() as? Outcome.Ok)?.let { r -> mutable.update { it.copy(pinned = r.value) } }
+        }
+    }
+    fun togglePin(message: InboxMessage) {
+        if (state.value.changing) return
+        val pinning = !state.value.isPinned(message.id)
+        mutable.update { it.copy(changing = true, error = null) }
+        viewModelScope.launch {
+            val result = if (pinning) inbox.pin(message.id) else inbox.unpin(message.id)
+            when (result) {
+                is Outcome.Ok -> mutable.update { s -> s.copy(changing = false, notice = if (pinning) "Pinned" else "Unpinned",
+                    pinned = if (pinning) listOf(message) + s.pinned.filterNot { it.id == message.id } else s.pinned.filterNot { it.id == message.id }) }
+                is Outcome.Err -> mutable.update { it.copy(changing = false, error = result.error) }
+            }
+        }
+    }
+    private val contactResults = MutableStateFlow<List<MailContact>>(emptyList())
+    val contactSuggestions = contactResults.asStateFlow()
+    private var contactJob: Job? = null
+    /** Loaded once per screen, on first use; a failure just means no suggestions. */
+    private var knownContacts: List<MailContact>? = null
+    /** Suggests up to five people for the recipient being typed (the text after the last comma). */
+    fun suggestContacts(to: String) {
+        contactJob?.cancel()
+        val term = to.substringAfterLast(',').trim().lowercase()
+        if (term.length < 2) { contactResults.value = emptyList(); return }
+        contactJob = viewModelScope.launch {
+            val all = knownContacts ?: (inbox.contacts() as? Outcome.Ok)?.value?.also { knownContacts = it }.orEmpty()
+            val chosen = to.split(',').map { it.trim().lowercase() }.toSet()
+            contactResults.value = all.filter { (term in it.email || term in it.name.lowercase()) && it.email !in chosen && it.email != term }.take(5)
+        }
+    }
+    /** Replaces the recipient being typed with the chosen contact. */
+    fun chooseContact(to: String, contact: MailContact): String {
+        contactResults.value = emptyList()
+        val before = to.substringBeforeLast(',', "").trim()
+        return (if (before.isEmpty()) "" else "$before, ") + contact.email + ", "
+    }
+    /** Renames and/or recolors a label; unchanged fields are not sent. */
+    fun editLabel(label: MailLabel, name: String, color: String?) {
+        val clean = name.trim().take(100)
+        val newName = clean.takeIf { it.isNotEmpty() && it != label.name }
+        val newColor = color?.takeIf { it != label.color }
+        if ((newName == null && newColor == null) || state.value.changing) return
+        mutable.update { it.copy(changing = true, error = null) }
+        viewModelScope.launch {
+            when (val result = inbox.updateLabel(label.id, newName, newColor)) {
+                is Outcome.Ok -> mutable.update { s -> s.copy(changing = false, notice = "Label updated",
+                    labels = s.labels.map { if (it.id == label.id) result.value else it }.sortedBy { l -> l.name.lowercase() }) }
+                is Outcome.Err -> mutable.update { it.copy(changing = false, error = result.error) }
+            }
+        }
+    }
+    /** Deletes the label; its messages stay in the mailbox. Leaves the label's view if it was open. */
+    fun deleteLabel(label: MailLabel) {
+        if (state.value.changing) return
+        mutable.update { it.copy(changing = true, error = null) }
+        viewModelScope.launch {
+            when (val result = inbox.deleteLabel(label.id)) {
+                is Outcome.Ok -> {
+                    val wasOpen = state.value.labelId == label.id
+                    mutable.update { s -> s.copy(changing = false, notice = "Label deleted. Its emails were kept.",
+                        labels = s.labels.filterNot { it.id == label.id },
+                        messages = s.messages.map { m -> m.copy(labelIds = m.labelIds - label.id) }) }
+                    if (wasOpen) selectFolder(MailFolder.Inbox)
+                }
+                is Outcome.Err -> mutable.update { it.copy(changing = false, error = result.error) }
+            }
+        }
+    }
     /** Applies exactly the chosen set of the user's labels to one message. */
     fun setLabels(message: InboxMessage, chosen: Set<String>) {
         if (state.value.changing) return
@@ -140,15 +222,24 @@ class MailHubViewModel @Inject constructor(
         viewModelScope.launch {
             val status = mail.status(config.config.value.chatbotId)
             if (token != generation) return@launch
-            if (status is Outcome.Err) { mutable.update { it.copy(loading = false, error = status.error) }; return@launch }
+            if (status is Outcome.Err) {
+                // Offline with a saved copy: show it read-only instead of an error.
+                val saved = if (status.error is AppError.Network) inbox.list(folder, query, null, labelId) else null
+                if (token != generation) return@launch
+                val page = (saved as? Outcome.Ok)?.value?.takeIf { it.savedAt != null }
+                if (page != null) mutable.update { it.copy(loading = false, loaded = true, messages = page.messages, cursor = null, savedAt = page.savedAt) }
+                else mutable.update { it.copy(loading = false, error = status.error) }
+                return@launch
+            }
             val current = (status as Outcome.Ok).value
             mutable.update { it.copy(status = current) }
             if (!current.eligible || current.connection?.status != ConnectionStatus.Active) {
                 mutable.update { it.copy(loading = false, loaded = false, messages = emptyList(), cursor = null) }; return@launch
             }
             loadLabels()
+            loadPinned()
             when (val result = inbox.list(folder, query, null, labelId)) {
-                is Outcome.Ok -> if (token == generation) mutable.update { it.copy(loading = false, loaded = true, messages = result.value.messages.distinctBy(InboxMessage::id), cursor = result.value.nextCursor) }
+                is Outcome.Ok -> if (token == generation) mutable.update { it.copy(loading = false, loaded = true, messages = result.value.messages.distinctBy(InboxMessage::id), cursor = result.value.nextCursor, savedAt = result.value.savedAt) }
                 is Outcome.Err -> if (token == generation) mutable.update { it.copy(loading = false, error = result.error) }
             }
         }

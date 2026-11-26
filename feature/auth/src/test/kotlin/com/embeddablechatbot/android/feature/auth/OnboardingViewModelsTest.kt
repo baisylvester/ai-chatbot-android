@@ -59,4 +59,12 @@ class OnboardingViewModelsTest {
         runCurrent();assertFalse(vm.state.value.ready);assertTrue(vm.state.value.error is AppError.Network)
         result=Outcome.Ok(Unit);vm.prepare();runCurrent();assertTrue(vm.state.value.ready);assertTrue(vm.state.value.connected)
     }
+    @Test fun `offline, an account set up on this phone opens anyway`()=runTest(dispatcher){
+        val vm=OnboardingViewModel(object:OnboardingRepository{override suspend fun prepare():Outcome<Unit> =Outcome.Err(AppError.Network(false))},FakeMailRepository(),FakeConfigRepository(),FakeAuthRepository(),FakePreferencesRepository(UserPreferences(onboardedAccounts=setOf("user-1"))))
+        runCurrent();assertTrue(vm.state.value.ready);assertTrue(vm.state.value.previouslyOnboarded);assertNull(vm.state.value.error)
+    }
+    @Test fun `server errors still block startup even for a set-up account`()=runTest(dispatcher){
+        val vm=OnboardingViewModel(object:OnboardingRepository{override suspend fun prepare():Outcome<Unit> =Outcome.Err(AppError.Server(500,"x"))},FakeMailRepository(),FakeConfigRepository(),FakeAuthRepository(),FakePreferencesRepository(UserPreferences(onboardedAccounts=setOf("user-1"))))
+        runCurrent();assertFalse(vm.state.value.ready);assertTrue(vm.state.value.error is AppError.Server)
+    }
 }

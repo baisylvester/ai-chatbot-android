@@ -65,6 +65,9 @@ class MailHubScreenTest {
         override suspend fun list(folder:MailFolder,query:String,cursor:String?,labelId:String?)=Outcome.Ok(InboxPage(if(showMessage) listOf(message) else emptyList(),null))
         override suspend fun labels():Outcome<List<MailLabel>> = Outcome.Ok(emptyList())
         override suspend fun createLabel(name:String):Outcome<MailLabel> = Outcome.Ok(MailLabel("Label_1",name))
+        val labelEdits=mutableListOf<Triple<String,String?,String?>>(); val labelDeletes=mutableListOf<String>()
+        override suspend fun updateLabel(id:String,name:String?,color:String?):Outcome<MailLabel> {labelEdits+=Triple(id,name,color); return Outcome.Ok(MailLabel(id,name?:"Clients",color))}
+        override suspend fun deleteLabel(id:String):Outcome<Unit> {labelDeletes+=id; return Outcome.Ok(Unit)}
         override suspend fun relabel(ids:List<String>,add:List<String>,remove:List<String>):Outcome<Unit> = Outcome.Ok(Unit)
         override suspend fun attachment(messageId:String,partId:String):Outcome<DownloadedFile> = Outcome.Err(AppError.NotFound("Missing"))
         override suspend fun attachmentText(messageId:String,partId:String):Outcome<AttachmentText> = Outcome.Err(AppError.NotFound("Missing"))

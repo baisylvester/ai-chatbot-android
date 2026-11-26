@@ -25,6 +25,14 @@ import kotlinx.serialization.Serializable
 }
 @Serializable data class MailLabelListDto(val labels: List<MailLabelDto> = emptyList())
 @Serializable data class CreateLabelBody(val name: String)
+@Serializable data class ThemeDto(val palette: String, val mode: String)
+/** `theme` is always sent, so explicitNulls=false cannot drop it. */
+@Serializable data class PreferencesDto(val theme: ThemeDto? = null)
+@Serializable data class PinnedListDto(val messages: List<InboxMessageDto> = emptyList())
+@Serializable data class PinBody(val id: String)
+@Serializable data class MailContactDto(val name: String = "", val email: String)
+@Serializable data class MailContactListDto(val contacts: List<MailContactDto> = emptyList())
+@Serializable data class UpdateLabelBody(val name: String? = null, val color: String? = null)
 @Serializable data class RelabelBody(val ids: List<String>, val add: List<String>, val remove: List<String>)
 @Serializable data class OkDto(val ok: Boolean = true)
 @Serializable data class AttachmentTextDto(val filename: String = "", val text: String = "", val truncated: Boolean = false)
