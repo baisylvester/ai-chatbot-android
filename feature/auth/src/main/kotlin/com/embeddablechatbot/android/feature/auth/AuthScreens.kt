@@ -145,6 +145,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpenMailbox: () -> Unit, viewModel: Set
             Text("${stringResource(R.string.settings_platform)}: ${state.platformUrl}", style = MaterialTheme.typography.bodySmall)
             Text("${stringResource(R.string.settings_chatbot)}: ${state.chatbotId}", style = MaterialTheme.typography.bodySmall)
             Text(stringResource(R.string.settings_change_hint), style = MaterialTheme.typography.bodySmall)
+            state.email?.let { email ->
+                HorizontalDivider()
+                ThemeSection(email, state.theme, viewModel::setPalette, viewModel::setThemeMode)
+            }
             HorizontalDivider()
             ToggleRow(stringResource(R.string.settings_stream), stringResource(R.string.settings_stream_hint), state.preferences.streamReplies, viewModel::setStreaming)
             ToggleRow(stringResource(R.string.settings_reminders), stringResource(R.string.settings_reminders_hint), state.preferences.approvalReminders, viewModel::setReminders)

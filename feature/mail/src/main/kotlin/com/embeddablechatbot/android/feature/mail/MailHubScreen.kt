@@ -177,7 +177,8 @@ private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit,
     Surface(color = MaterialTheme.colorScheme.background) {
         Column {
             Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp), verticalAlignment = Alignment.Top) {
-                Surface(shape = CircleShape, color = avatarColor(name), modifier = Modifier.size(44.dp)) { Box(contentAlignment = Alignment.Center) { Text(name.take(1).uppercase().ifBlank { "M" },color = AvatarInk,fontWeight = FontWeight.SemiBold) } }
+                val (avatarBg, avatarInk) = avatarColors(name)
+                Surface(shape = CircleShape, color = avatarBg, modifier = Modifier.size(44.dp)) { Box(contentAlignment = Alignment.Center) { Text(name.take(1).uppercase().ifBlank { "M" },color = avatarInk,fontWeight = FontWeight.SemiBold) } }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -204,7 +205,6 @@ private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit,
     }
 }
 
-@Composable private fun avatarColor(name: String): Color = AvatarTints[(name.hashCode() and Int.MAX_VALUE) % AvatarTints.size]
 private fun mailDate(raw: String): String = runCatching { ZonedDateTime.parse(raw,DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ofPattern("MMM d")) }.getOrElse { raw.take(10) }
 
 @Composable

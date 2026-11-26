@@ -31,4 +31,9 @@
     <string name="settings_sign_out_confirm">Sign out? Saved conversations and pending requests on this device will be removed. Your conversations stay on the server.</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_back">Back</string>
+    <string name="settings_theme">Color theme</string>
+    <string name="settings_theme_hint">Saved for %1$s. Other accounts on this phone keep their own theme.</string>
+    <string name="settings_mode_system">System</string>
+    <string name="settings_mode_light">Light</string>
+    <string name="settings_mode_dark">Dark</string>
 </resources>

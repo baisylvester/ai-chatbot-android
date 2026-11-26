@@ -104,26 +104,28 @@ class ConfigRepositoryImpl @Inject constructor(
 
 @Singleton
 class PreferencesRepositoryImpl @Inject constructor(@param:ApplicationContext private val context: Context) : PreferencesRepository {
-    override val preferences: Flow<UserPreferences> = context.prefsStore.data.map {
-        UserPreferences(
-            streamReplies = it[STREAM] ?: true,
-            mailToolsEnabled = it[MAIL_TOOLS] ?: true,
-            approvalReminders = it[REMINDERS] ?: false,
-            favoritePrompts = it[FAVORITES] ?: emptySet(),
-            onboardedAccounts = it[ONBOARDED] ?: emptySet(),
-        )
-    }
+    override val preferences: Flow<UserPreferences> = context.prefsStore.data.map(::read)
 
     override suspend fun update(transform: (UserPreferences) -> UserPreferences) {
         context.prefsStore.edit { p ->
-            val next = transform(UserPreferences(p[STREAM] ?: true, p[MAIL_TOOLS] ?: true, p[REMINDERS] ?: false, p[FAVORITES] ?: emptySet(), p[ONBOARDED] ?: emptySet()))
+            val next = transform(read(p))
             p[STREAM] = next.streamReplies
             p[MAIL_TOOLS] = next.mailToolsEnabled
             p[REMINDERS] = next.approvalReminders
             p[FAVORITES] = next.favoritePrompts
             p[ONBOARDED] = next.onboardedAccounts
+            p[THEMES] = encodeThemes(next.accountThemes)
         }
     }
+
+    private fun read(p: androidx.datastore.preferences.core.Preferences) = UserPreferences(
+        streamReplies = p[STREAM] ?: true,
+        mailToolsEnabled = p[MAIL_TOOLS] ?: true,
+        approvalReminders = p[REMINDERS] ?: false,
+        favoritePrompts = p[FAVORITES] ?: emptySet(),
+        onboardedAccounts = p[ONBOARDED] ?: emptySet(),
+        accountThemes = decodeThemes(p[THEMES] ?: emptySet()),
+    )
 
     private companion object {
         val STREAM = booleanPreferencesKey("stream_replies")
@@ -131,8 +133,19 @@ class PreferencesRepositoryImpl @Inject constructor(@param:ApplicationContext pr
         val REMINDERS = booleanPreferencesKey("approval_reminders")
         val FAVORITES = stringSetPreferencesKey("favorite_prompts")
         val ONBOARDED = stringSetPreferencesKey("onboarded_accounts")
+        val THEMES = stringSetPreferencesKey("account_themes")
     }
 }
+
+/** Account themes are stored as `userId=palette:mode` entries; malformed entries are skipped. */
+internal fun encodeThemes(themes: Map<String, com.embeddablechatbot.android.core.domain.model.ThemeChoice>): Set<String> =
+    themes.mapTo(mutableSetOf()) { (user, choice) -> "$user=${choice.encode()}" }
+
+internal fun decodeThemes(entries: Set<String>): Map<String, com.embeddablechatbot.android.core.domain.model.ThemeChoice> =
+    entries.mapNotNull { entry ->
+        val user = entry.substringBefore('=', "")
+        if (user.isBlank()) null else user to com.embeddablechatbot.android.core.domain.model.ThemeChoice.decode(entry.substringAfter('='))
+    }.toMap()
 
 @Singleton
 class ChatbotRepositoryImpl @Inject constructor(private val api: ClientApi) : ChatbotRepository {

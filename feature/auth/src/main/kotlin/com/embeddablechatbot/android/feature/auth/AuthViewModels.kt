@@ -131,7 +131,11 @@ data class SettingsUiState(
     val platformUrl: String = "",
     val chatbotId: String = "",
     val preferences: UserPreferences = UserPreferences(),
-)
+    val userId: String? = null,
+) {
+    /** The signed-in account's theme. */
+    val theme: com.embeddablechatbot.android.core.domain.model.ThemeChoice get() = preferences.themeFor(userId)
+}
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -140,8 +144,21 @@ class SettingsViewModel @Inject constructor(
     private val preferences: PreferencesRepository,
 ) : ViewModel() {
     val state: StateFlow<SettingsUiState> = combine(auth.authState, config.config, preferences.preferences) { a, c, p ->
-        SettingsUiState((a as? AuthState.SignedIn)?.account?.email, c.platformUrl, c.chatbotId, p)
+        val account = (a as? AuthState.SignedIn)?.account
+        SettingsUiState(account?.email, c.platformUrl, c.chatbotId, p, account?.userId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    /** Saves the palette for the signed-in account only; other accounts on this phone keep theirs. */
+    fun setPalette(palette: com.embeddablechatbot.android.core.domain.model.ThemePalette) = updateTheme { it.copy(palette = palette) }
+    fun setThemeMode(mode: com.embeddablechatbot.android.core.domain.model.ThemeMode) = updateTheme { it.copy(mode = mode) }
+
+    private fun updateTheme(change: (com.embeddablechatbot.android.core.domain.model.ThemeChoice) -> com.embeddablechatbot.android.core.domain.model.ThemeChoice) {
+        viewModelScope.launch {
+            // Read the account now, not from the UI state, so a change never lands on another account.
+            val user = (auth.authState.value as? AuthState.SignedIn)?.account?.userId ?: return@launch
+            preferences.update { p -> p.copy(accountThemes = p.accountThemes + (user to change(p.themeFor(user)))) }
+        }
+    }
 
     private var signingOut = false
 

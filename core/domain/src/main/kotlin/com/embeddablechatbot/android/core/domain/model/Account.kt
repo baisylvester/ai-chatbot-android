@@ -69,4 +69,38 @@ data class UserPreferences(
     val approvalReminders: Boolean = false,
     val favoritePrompts: Set<String> = emptySet(),
     val onboardedAccounts: Set<String> = emptySet(),
-)
+    /** Each signed-in account's own theme, by account user id. Kept after sign-out so it returns on sign-in. */
+    val accountThemes: Map<String, ThemeChoice> = emptyMap(),
+) {
+    /** The theme for this account, or the default when it has none (or nobody is signed in). */
+    fun themeFor(userId: String?): ThemeChoice = userId?.let(accountThemes::get) ?: ThemeChoice()
+}
+
+/** App color palettes. [Device] uses the phone's wallpaper colors (Android 12+), else the default. */
+enum class ThemePalette(val id: String, val title: String) {
+    BlueMint("blue_mint", "Blue & mint"),
+    Violet("violet", "Violet"),
+    Forest("forest", "Forest"),
+    Sunset("sunset", "Sunset"),
+    Rose("rose", "Rose"),
+    Graphite("graphite", "Graphite"),
+    Device("device", "Match my wallpaper");
+
+    companion object {
+        fun fromId(id: String?): ThemePalette = entries.firstOrNull { it.id == id } ?: BlueMint
+    }
+}
+
+enum class ThemeMode { System, Light, Dark }
+
+data class ThemeChoice(val palette: ThemePalette = ThemePalette.BlueMint, val mode: ThemeMode = ThemeMode.System) {
+    /** Stored as `palette:mode`, for example `forest:Dark`. Unknown parts fall back to defaults. */
+    fun encode(): String = "${palette.id}:${mode.name}"
+
+    companion object {
+        fun decode(value: String): ThemeChoice {
+            val (palette, mode) = (value.split(':') + listOf("", "")).take(2)
+            return ThemeChoice(ThemePalette.fromId(palette), ThemeMode.entries.firstOrNull { it.name == mode } ?: ThemeMode.System)
+        }
+    }
+}

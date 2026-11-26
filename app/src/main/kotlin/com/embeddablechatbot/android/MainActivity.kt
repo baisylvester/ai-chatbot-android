@@ -118,6 +118,11 @@ class MainViewModel @Inject constructor(
     val remindersEnabled: StateFlow<Boolean> = preferences.preferences.map { it.approvalReminders }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** The signed-in account's own theme; the default when signed out. Switches with the account. */
+    val theme: StateFlow<com.embeddablechatbot.android.core.domain.model.ThemeChoice> = combine(auth.authState, preferences.preferences) { a, p ->
+        p.themeFor((a as? AuthState.SignedIn)?.account?.userId)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.embeddablechatbot.android.core.domain.model.ThemeChoice())
+
     private val requests = Channel<NavRequest>(Channel.BUFFERED)
     val navRequests: Flow<NavRequest> = requests.receiveAsFlow()
 
@@ -160,7 +165,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) handle(intent)
-        setContent { ChatbotTheme { AppRoot(viewModel) } }
+        setContent {
+            val theme by viewModel.theme.collectAsStateWithLifecycle()
+            val dark = com.embeddablechatbot.android.core.designsystem.isAppInDarkTheme(theme)
+            // Status and navigation bar icons follow the app's theme, which may differ from the system's.
+            LaunchedEffect(dark) {
+                val style = androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            ChatbotTheme(theme) { AppRoot(viewModel) }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
