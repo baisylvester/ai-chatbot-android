@@ -52,7 +52,8 @@ class ConnectCallbackBus @Inject constructor() {
     fun take(): ConnectCallback? = latest.getAndUpdate { null }
 }
 
-enum class MailNotice { Connected, Disconnected, ConnectIgnored, Switched, CalendarDisconnected }
+/** [Unfinished]: the user came back from the browser without a completed sign-in (cancelled, or Google showed an error). */
+enum class MailNotice { Connected, Disconnected, ConnectIgnored, Switched, CalendarDisconnected, Unfinished }
 
 data class MailUiState(
     val loading: Boolean = true,
@@ -88,8 +89,16 @@ class MailViewModel @Inject constructor(
 
     private val accountId: String? get() = (auth.authState.value as? AuthState.SignedIn)?.account?.userId
 
+    /** Set while a browser sign-in is open; cleared when its result comes back. */
+    private var awaitingBrowser = false
+
     /** Called whenever the screen starts (including returning from the browser). */
     fun refresh() {
+        if (awaitingBrowser) viewModelScope.launch {
+            // The return link is delivered just after the screen resumes; give it a moment first.
+            kotlinx.coroutines.delay(2_000)
+            if (awaitingBrowser) { awaitingBrowser = false; _state.update { if (it.busy) it else it.copy(notice = MailNotice.Unfinished) } }
+        }
         viewModelScope.launch {
             val chatbotId = config.config.value.chatbotId
             val status = mail.status(chatbotId)
@@ -114,7 +123,7 @@ class MailViewModel @Inject constructor(
         _state.update { it.copy(busy = true, error = null, declined = null, notice = null) }
         viewModelScope.launch {
             when (val result = connect.start(config.config.value.chatbotId, account, target)) {
-                is Outcome.Ok -> effects.send(MailEffect.OpenBrowser(result.value))
+                is Outcome.Ok -> { awaitingBrowser = true; effects.send(MailEffect.OpenBrowser(result.value)) }
                 is Outcome.Err -> _state.update { it.copy(error = result.error) }
             }
             _state.update { it.copy(busy = false) }
@@ -122,6 +131,7 @@ class MailViewModel @Inject constructor(
     }
 
     private suspend fun completeConnect(callback: ConnectCallback) {
+        awaitingBrowser = false
         val account = accountId ?: return
         _state.update { it.copy(busy = true, error = null, declined = null) }
         when (val result = connect.complete(callback, account)) {

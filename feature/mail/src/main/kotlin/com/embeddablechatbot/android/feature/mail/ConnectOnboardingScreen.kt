@@ -45,6 +45,7 @@ fun ConnectOnboardingScreen(onFinished:()->Unit,viewModel:MailViewModel=hiltView
             Text(stringResource(R.string.connect_onboard_safety),color=MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let{StatusBanner(it.message(),BannerTone.Error,actionLabel=stringResource(R.string.connect_onboard_retry),onAction=viewModel::startConnect)}
             state.declined?.let{StatusBanner(it,BannerTone.Warning)}
+            if(state.notice==MailNotice.Unfinished)StatusBanner(stringResource(R.string.mail_unfinished_notice),BannerTone.Warning,actionLabel=stringResource(R.string.connect_onboard_retry),onAction={viewModel.startConnect()})
             if(state.loading&&state.status==null)CircularProgressIndicator()
             val available=state.status?.let{it.serverReady&&it.eligible}==true
             if(state.status!=null&&!available)StatusBanner(stringResource(R.string.connect_onboard_unavailable),BannerTone.Warning,actionLabel=stringResource(R.string.connect_onboard_retry),onAction=viewModel::refresh)

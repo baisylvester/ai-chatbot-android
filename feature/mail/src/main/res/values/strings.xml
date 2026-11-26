@@ -104,4 +104,5 @@
     <string name="mail_calendar_connect">Connect Google Calendar</string>
     <string name="mail_calendar_disconnect">Disconnect calendar</string>
     <string name="mail_calendar_disconnected">Google Calendar was disconnected.</string>
+    <string name="mail_unfinished_notice">Sign-in did not finish. If Google showed an error page, close it and tap Connect again: each attempt starts a fresh link. Choose the account you want to connect and finish without pressing Back.</string>
 </resources>

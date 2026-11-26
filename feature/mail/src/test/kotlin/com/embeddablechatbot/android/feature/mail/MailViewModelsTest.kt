@@ -20,6 +20,7 @@ import com.embeddablechatbot.android.core.domain.testing.sendDetail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -155,6 +156,24 @@ class MailViewModelTest {
             assertEquals(MailEffect.OpenBrowser("https://accounts.google.com/o/oauth2/v2/auth?x"), awaitItem())
         }
         assertEquals("tx-1", store.value!!.transactionId)
+    }
+
+    @Test
+    fun `coming back without a return link says the sign-in did not finish`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.effect.test { vm.startConnect(); runCurrent(); awaitItem() }
+        vm.refresh(); advanceTimeBy(2_500); runCurrent()
+        assertEquals(MailNotice.Unfinished, vm.state.value.notice)
+    }
+
+    @Test
+    fun `a return link that arrives right after resuming is not reported as unfinished`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.effect.test { vm.startConnect(); runCurrent(); awaitItem() }
+        vm.refresh()
+        bus.post(ConnectCallback("tx-1", "k".repeat(43), null)); runCurrent()
+        advanceTimeBy(2_500); runCurrent()
+        assertEquals(MailNotice.Connected, vm.state.value.notice)
     }
 
     @Test

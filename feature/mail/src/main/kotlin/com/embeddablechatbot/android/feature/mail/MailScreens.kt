@@ -114,6 +114,7 @@ fun MailScreen(onBack: () -> Unit, onOpenAction: (String) -> Unit, viewModel: Ma
                 MailNotice.ConnectIgnored -> StatusBanner(stringResource(R.string.mail_ignored_notice), BannerTone.Warning)
                 MailNotice.Switched -> StatusBanner(stringResource(R.string.mail_switched_notice), BannerTone.Info)
                 MailNotice.CalendarDisconnected -> StatusBanner(stringResource(R.string.mail_calendar_disconnected), BannerTone.Info)
+                MailNotice.Unfinished -> StatusBanner(stringResource(R.string.mail_unfinished_notice), BannerTone.Warning)
                 null -> Unit
             }
             Text(stringResource(R.string.mail_mailboxes), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
