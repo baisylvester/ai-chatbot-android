@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MailAssistant" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Window colour before Compose draws, matching the blue/mint theme's background (no white flash). -->
+    <style name="Theme.MailAssistant" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:colorAccent">@color/brand_blue</item>
+    </style>
+    <color name="window_background">#F5FAFD</color>
+    <color name="brand_blue">#1E5FD8</color>
 </resources>

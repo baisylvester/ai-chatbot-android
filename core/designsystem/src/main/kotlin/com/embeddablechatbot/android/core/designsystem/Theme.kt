@@ -32,26 +32,71 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+/**
+ * Blue (primary), mint blue (secondary) and mint green (tertiary). Text/container pairs keep at least
+ * 4.5:1 contrast in both themes. Warnings use their own amber (see [StatusColors]), never mint green.
+ */
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF542BEB),
+    primary = Color(0xFF1E5FD8),
     onPrimary = Color.White,
-    secondary = Color(0xFF545F71),
-    tertiary = Color(0xFF8A5100),
+    primaryContainer = Color(0xFFDCE7FF),
+    onPrimaryContainer = Color(0xFF0A2A6B),
+    secondary = Color(0xFF00707F),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFC9F3F7),
+    onSecondaryContainer = Color(0xFF003C44),
+    tertiary = Color(0xFF17795A),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFC6F4DE),
+    onTertiaryContainer = Color(0xFF00391F),
     error = Color(0xFFBA1A1A),
-    background = Color(0xFFFDFDFF),
-    surface = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF5F4F8),
-    primaryContainer = Color(0xFFECE5FF),
-    onPrimaryContainer = Color(0xFF382079),
+    background = Color(0xFFF5FAFD),
+    onBackground = Color(0xFF151C21),
+    surface = Color(0xFFFAFDFF),
+    onSurface = Color(0xFF151C21),
+    surfaceVariant = Color(0xFFDDE8EF),
+    onSurfaceVariant = Color(0xFF41505A),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFEEF6FA),
+    surfaceContainer = Color(0xFFE8F2F7),
+    surfaceContainerHigh = Color(0xFFE2EDF3),
+    surfaceContainerHighest = Color(0xFFDCE7EE),
+    outline = Color(0xFF6F7E88),
+    outlineVariant = Color(0xFFC1CFD8),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFCEBFFF),
-    onPrimary = Color(0xFF2D126D),
-    secondary = Color(0xFFBCC7DC),
-    tertiary = Color(0xFFFFB86E),
+    primary = Color(0xFFAFC6FF),
+    onPrimary = Color(0xFF002D6E),
+    primaryContainer = Color(0xFF1846A6),
+    onPrimaryContainer = Color(0xFFDCE7FF),
+    secondary = Color(0xFF7ED8E4),
+    onSecondary = Color(0xFF00363D),
+    secondaryContainer = Color(0xFF004F59),
+    onSecondaryContainer = Color(0xFFC9F3F7),
+    tertiary = Color(0xFF8ADBB5),
+    onTertiary = Color(0xFF003822),
+    tertiaryContainer = Color(0xFF005236),
+    onTertiaryContainer = Color(0xFFC6F4DE),
     error = Color(0xFFFFB4AB),
+    background = Color(0xFF0E1418),
+    onBackground = Color(0xFFDDE4E9),
+    surface = Color(0xFF0E1418),
+    onSurface = Color(0xFFDDE4E9),
+    surfaceVariant = Color(0xFF3F4A51),
+    onSurfaceVariant = Color(0xFFBFC9D0),
+    surfaceContainerLowest = Color(0xFF091013),
+    surfaceContainerLow = Color(0xFF151D22),
+    surfaceContainer = Color(0xFF19232A),
+    surfaceContainerHigh = Color(0xFF222D34),
+    surfaceContainerHighest = Color(0xFF2D383F),
+    outline = Color(0xFF89949B),
+    outlineVariant = Color(0xFF3F4A51),
 )
+
+/** Soft tints for sender avatars: blue, mint blue and mint green, readable with [AvatarInk]. */
+val AvatarTints = listOf(Color(0xFFDCE7FF), Color(0xFFC9F3F7), Color(0xFFC6F4DE), Color(0xFFE3EEFF), Color(0xFFD5F6EC))
+val AvatarInk = Color(0xFF0B2E46)
 
 @Composable
 fun ChatbotTheme(darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Boolean = false, content: @Composable () -> Unit) {
@@ -68,8 +113,8 @@ fun ChatbotTheme(darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Boole
 
 /** Status colours that keep contrast in both themes. */
 object StatusColors {
-    @Composable fun warningContainer() = MaterialTheme.colorScheme.tertiaryContainer
-    @Composable fun onWarningContainer() = MaterialTheme.colorScheme.onTertiaryContainer
+    @Composable fun warningContainer() = if (isSystemInDarkTheme()) Color(0xFF5A4200) else Color(0xFFFFE6AD)
+    @Composable fun onWarningContainer() = if (isSystemInDarkTheme()) Color(0xFFFFE08A) else Color(0xFF3D2A00)
 }
 
 @Composable
@@ -108,7 +153,7 @@ fun StatusBanner(
 ) {
     val (container, content) = when (tone) {
         BannerTone.Info -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-        BannerTone.Warning -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+        BannerTone.Warning -> StatusColors.warningContainer() to StatusColors.onWarningContainer()
         BannerTone.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
     }
     Surface(color = container, contentColor = content, shape = MaterialTheme.shapes.medium, modifier = modifier.fillMaxWidth()) {

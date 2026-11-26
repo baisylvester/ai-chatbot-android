@@ -121,10 +121,10 @@ fun MailHubScreen(onAssistant: (String?) -> Unit, onSettings: () -> Unit, onConn
             ) },
             bottomBar = { NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 NavigationBarItem(selected = state.tab == HubTab.Mail, onClick = { viewModel.selectTab(HubTab.Mail) }, icon = { Icon(Icons.Default.MailOutline, null) }, label = { Text(stringResource(R.string.hub_inbox)) })
-                NavigationBarItem(selected = false, onClick = { onAssistant(null) }, icon = { Text("✦", style = MaterialTheme.typography.titleLarge) }, label = { Text(stringResource(R.string.hub_assistant)) })
+                NavigationBarItem(selected = false, onClick = { onAssistant(null) }, icon = { Text("✦", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.tertiary) }, label = { Text(stringResource(R.string.hub_assistant)) })
                 NavigationBarItem(selected = state.tab == HubTab.Prompts, onClick = { viewModel.selectTab(HubTab.Prompts) }, icon = { Icon(Icons.Default.List, null) }, label = { Text(stringResource(R.string.hub_prompts)) })
             } },
-            floatingActionButton = { if (state.tab == HubTab.Mail && state.status?.connection?.status == ConnectionStatus.Active) ExtendedFloatingActionButton(onClick = { viewModel.compose() }, icon = { Icon(Icons.Default.Edit, null) }, text = { Text(stringResource(R.string.hub_compose)) }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) },
+            floatingActionButton = { if (state.tab == HubTab.Mail && state.status?.connection?.status == ConnectionStatus.Active) ExtendedFloatingActionButton(onClick = { viewModel.compose() }, icon = { Icon(Icons.Default.Edit, null) }, text = { Text(stringResource(R.string.hub_compose)) }, containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) },
         ) { padding ->
             when (state.tab) {
                 HubTab.Mail -> InboxBody(state, viewModel, searchVisible, onConnection, Modifier.padding(padding), onLabels = { labelTarget = it })
@@ -177,7 +177,7 @@ private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit,
     Surface(color = MaterialTheme.colorScheme.background) {
         Column {
             Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp), verticalAlignment = Alignment.Top) {
-                Surface(shape = CircleShape, color = avatarColor(name), modifier = Modifier.size(44.dp)) { Box(contentAlignment = Alignment.Center) { Text(name.take(1).uppercase().ifBlank { "M" },color = Color(0xFF41315D),fontWeight = FontWeight.SemiBold) } }
+                Surface(shape = CircleShape, color = avatarColor(name), modifier = Modifier.size(44.dp)) { Box(contentAlignment = Alignment.Center) { Text(name.take(1).uppercase().ifBlank { "M" },color = AvatarInk,fontWeight = FontWeight.SemiBold) } }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -204,7 +204,7 @@ private fun MessageRow(message: InboxMessage, busy: Boolean, onOpen: () -> Unit,
     }
 }
 
-@Composable private fun avatarColor(name: String): Color = listOf(Color(0xFFEAE1FF),Color(0xFFDCEEFF),Color(0xFFFFE8DA),Color(0xFFDDF3E8),Color(0xFFF8DFF0))[(name.hashCode() and Int.MAX_VALUE) % 5]
+@Composable private fun avatarColor(name: String): Color = AvatarTints[(name.hashCode() and Int.MAX_VALUE) % AvatarTints.size]
 private fun mailDate(raw: String): String = runCatching { ZonedDateTime.parse(raw,DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ofPattern("MMM d")) }.getOrElse { raw.take(10) }
 
 @Composable
